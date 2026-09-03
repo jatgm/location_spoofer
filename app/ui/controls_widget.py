@@ -8,7 +8,7 @@ from PyQt6.QtCore import pyqtSignal, Qt, QTimer, QThread
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QDoubleSpinBox, QPushButton, QGridLayout, QFrame,
-    QLineEdit, QListWidget, QListWidgetItem
+    QLineEdit, QListWidget, QListWidgetItem, QAbstractSpinBox
 )
 from app.core.geolocation import search_addresses
 
@@ -118,6 +118,7 @@ class ControlsWidget(QWidget):
         self.spin_lat.setSingleStep(0.001)
         self.spin_lat.setValue(37.334900)
         self.spin_lat.setFixedHeight(34)
+        self.spin_lat.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.spin_lat.valueChanged.connect(self._on_spin_changed)
 
         grid.addWidget(lbl_lat, 0, 0)
@@ -132,6 +133,7 @@ class ControlsWidget(QWidget):
         self.spin_lon.setSingleStep(0.001)
         self.spin_lon.setValue(-122.009020)
         self.spin_lon.setFixedHeight(34)
+        self.spin_lon.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.spin_lon.valueChanged.connect(self._on_spin_changed)
 
         grid.addWidget(lbl_lon, 0, 1)

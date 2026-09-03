@@ -94,15 +94,41 @@ QDoubleSpinBox:focus {
     background-color: #141722;
 }
 
+/* Remove stepper buttons so the box has a uniform, single color throughout */
 QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
-    width: 18px;
-    background-color: #1a1e2a;
-    border-left: 1px solid #262b3a;
-    border-radius: 0px;
+    width: 0px;
+    height: 0px;
+    border: none;
+    background: transparent;
 }
 
-QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {
-    background-color: #242a3a;
+/* Large, easy-to-grab splitter divider with hover highlight */
+QSplitter::handle {
+    background-color: #141722;
+}
+
+QSplitter::handle:horizontal {
+    width: 10px;
+    border-left: 1px solid #232a3b;
+    border-right: 1px solid #232a3b;
+}
+
+QSplitter::handle:horizontal:hover {
+    background-color: #0a84ff;
+    border-left: 1px solid #38bdf8;
+    border-right: 1px solid #38bdf8;
+}
+
+QSplitter::handle:vertical {
+    height: 10px;
+    border-top: 1px solid #232a3b;
+    border-bottom: 1px solid #232a3b;
+}
+
+QSplitter::handle:vertical:hover {
+    background-color: #0a84ff;
+    border-top: 1px solid #38bdf8;
+    border-bottom: 1px solid #38bdf8;
 }
 
 /* Address Search Input */

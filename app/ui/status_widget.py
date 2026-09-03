@@ -86,9 +86,10 @@ class StatusWidget(QWidget):
 
         layout.addStretch()
 
-        # Device Selector Combo
+        # Device Selector Combo (Generous width to prevent any text clipping)
         self.combo_devices = QComboBox(self)
-        self.combo_devices.setMinimumWidth(220)
+        self.combo_devices.setMinimumWidth(320)
+        self.combo_devices.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         self.combo_devices.currentIndexChanged.connect(self._on_device_combo_changed)
         layout.addWidget(self.combo_devices)
 
@@ -147,6 +148,24 @@ class StatusWidget(QWidget):
             f"}}"
         )
 
+    MODEL_MAP = {
+        "iPhone17,1": "iPhone 16 Pro",
+        "iPhone17,2": "iPhone 16 Pro Max",
+        "iPhone17,3": "iPhone 16",
+        "iPhone17,4": "iPhone 16 Plus",
+        "iPhone16,1": "iPhone 15 Pro Max",
+        "iPhone16,2": "iPhone 15 Pro",
+        "iPhone15,4": "iPhone 15",
+        "iPhone15,5": "iPhone 15 Plus",
+        "iPhone15,2": "iPhone 14 Pro",
+        "iPhone15,3": "iPhone 14 Pro Max",
+        "iPhone14,7": "iPhone 14",
+        "iPhone14,8": "iPhone 14 Plus",
+        "iPhone14,2": "iPhone 13 Pro",
+        "iPhone14,3": "iPhone 13 Pro Max",
+        "iPhone14,5": "iPhone 13",
+    }
+
     def update_devices(self, devices: List[Dict[str, Any]]):
         self._devices = devices
         self.combo_devices.blockSignals(True)
@@ -159,8 +178,15 @@ class StatusWidget(QWidget):
             self.set_status("NO_DEVICE")
         else:
             for dev in devices:
-                label = f"{dev['name']} ({dev['model']}) - iOS {dev['version']}"
+                model_name = self.MODEL_MAP.get(dev["model"], dev["model"])
+                if dev["name"] and dev["name"] not in ("iOS Device", "iPhone"):
+                    label = f"{dev['name']} ({model_name}) • iOS {dev['version']}"
+                else:
+                    label = f"{model_name} • iOS {dev['version']}"
                 self.combo_devices.addItem(label, dev)
+                idx = self.combo_devices.count() - 1
+                self.combo_devices.setItemData(idx, label, Qt.ItemDataRole.ToolTipRole)
+
             self.combo_devices.setEnabled(True)
 
             primary = devices[0]

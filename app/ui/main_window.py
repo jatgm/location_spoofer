@@ -60,7 +60,7 @@ class MainWindow(QMainWindow):
 
         # 2. Main Horizontal Splitter (Left: Full-Height Map, Right: Controls & Console)
         main_splitter = QSplitter(Qt.Orientation.Horizontal, self)
-        main_splitter.setHandleWidth(3)
+        main_splitter.setHandleWidth(10)
 
         # Left: Interactive Map (Spans full window height)
         self.map_widget = MapWidget(self)
@@ -68,7 +68,7 @@ class MainWindow(QMainWindow):
 
         # Right: Vertical Splitter containing Controls Tabs on top & Console on bottom
         right_splitter = QSplitter(Qt.Orientation.Vertical, self)
-        right_splitter.setHandleWidth(3)
+        right_splitter.setHandleWidth(10)
 
         # Controls Tabs (Single Location & Route Simulation)
         self.tabs = QTabWidget(self)
