@@ -3,7 +3,7 @@ Main Application Window for iOS 17+ Location Spoofer.
 Integrates the Map, Controls, Status, and Log widgets with the background QThread.
 """
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QSplitter, QMessageBox, QTabWidget, QScrollArea, QFrame
@@ -120,10 +120,14 @@ class MainWindow(QMainWindow):
         self.status_widget.sig_device_selected.connect(self.worker.set_target_device)
         self.status_widget.sig_keep_awake_toggled.connect(self._on_keep_awake_toggled)
 
+        # Tab switching
+        self.tabs.currentChanged.connect(self._on_tab_changed)
+
         # Route Actions -> Worker
         self.route_widget.btn_set_dest_from_map.clicked.connect(
             lambda: self.route_widget.set_destination(self._current_lat, self._current_lon)
         )
+        self.route_widget.sig_destination_changed.connect(self._on_route_destination_selected)
         self.route_widget.sig_start_route.connect(self.worker.start_route_simulation)
         self.route_widget.sig_start_gpx.connect(self.worker.start_gpx_simulation)
         self.route_widget.sig_pause_route.connect(self.worker.pause_route_simulation)
@@ -147,6 +151,41 @@ class MainWindow(QMainWindow):
         self.worker.sig_route_progress.connect(self._on_route_progress)
         self.worker.sig_route_finished.connect(self._on_route_finished)
         self.worker.sig_route_stopped.connect(self.map_widget.clear_route)
+
+    def _on_tab_changed(self, index: int):
+        if index == 1:
+            # Route Simulation tab: default start to current location and preview route
+            if hasattr(self, "_current_lat"):
+                self.route_widget.set_start_location(self._current_lat, self._current_lon)
+            dest_lat = self.route_widget.dest_lat.value()
+            dest_lon = self.route_widget.dest_lon.value()
+            self._on_route_destination_selected(dest_lat, dest_lon)
+        else:
+            # Single Location tab: restore pin position
+            if not self.route_widget.is_running:
+                self.map_widget.clear_route()
+                if hasattr(self, "_current_lat"):
+                    self.map_widget.set_coordinates(self._current_lat, self._current_lon, pan=True)
+
+    def _on_route_destination_selected(self, dest_lat: float, dest_lon: float):
+        """When destination address or coords change, preview the turn-by-turn road route on the map."""
+        start_lat = self.route_widget.start_lat.value()
+        start_lon = self.route_widget.start_lon.value()
+
+        # Update destination pin on the map
+        self.map_widget.set_coordinates(dest_lat, dest_lon, pan=False)
+
+        import threading
+        def fetch_route_preview():
+            try:
+                from app.core.route_simulator import fetch_osrm_route
+                coords = fetch_osrm_route(start_lat, start_lon, dest_lat, dest_lon)
+                if coords:
+                    QTimer.singleShot(0, lambda: self.map_widget.draw_route(coords))
+            except Exception:
+                pass
+
+        threading.Thread(target=fetch_route_preview, daemon=True).start()
 
     def _on_real_location_detected(self, lat: float, lon: float, desc: str):
         """Called upon initial app startup or on-demand location detection."""

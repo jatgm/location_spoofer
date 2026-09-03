@@ -4,12 +4,26 @@ importing GPX files, and controlling continuous route playback.
 """
 
 from typing import Optional
-from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtCore import pyqtSignal, Qt, QTimer, QThread
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QDoubleSpinBox, QPushButton, QSlider, QProgressBar,
-    QFileDialog, QFrame, QGridLayout
+    QFileDialog, QFrame, QGridLayout, QLineEdit,
+    QListWidget, QListWidgetItem, QAbstractSpinBox
 )
+from app.core.geolocation import search_addresses
+
+
+class GeocodeSearchThread(QThread):
+    sig_results = pyqtSignal(list)
+
+    def __init__(self, query: str, parent=None):
+        super().__init__(parent)
+        self.query = query
+
+    def run(self):
+        results = search_addresses(self.query, limit=5)
+        self.sig_results.emit(results)
 
 
 class RouteWidget(QWidget):
@@ -20,6 +34,7 @@ class RouteWidget(QWidget):
     sig_pause_route = pyqtSignal()
     sig_resume_route = pyqtSignal()
     sig_stop_route = pyqtSignal()
+    sig_destination_changed = pyqtSignal(float, float)              # dest_lat, dest_lon
 
     SPEED_PROFILES = [
         ("Walk (5 km/h)", 5.0),
@@ -33,6 +48,14 @@ class RouteWidget(QWidget):
         self.is_running: bool = False
         self.is_paused: bool = False
         self.gpx_filepath: Optional[str] = None
+        self._search_thread: Optional[GeocodeSearchThread] = None
+
+        # Debounce timer for destination address search
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(350)
+        self._search_timer.timeout.connect(self._do_dest_search)
+
         self._init_ui()
 
     def _init_ui(self):
@@ -79,6 +102,8 @@ class RouteWidget(QWidget):
         self.speed_spin.setValue(50.0)
         self.speed_spin.setSuffix(" km/h")
         self.speed_spin.setDecimals(1)
+        self.speed_spin.setFixedHeight(34)
+        self.speed_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.speed_spin.valueChanged.connect(self._on_spin_changed)
         slider_row.addWidget(self.speed_spin)
 
@@ -96,6 +121,33 @@ class RouteWidget(QWidget):
         dest_title.setProperty("class", "SectionTitle")
         dc_layout.addWidget(dest_title)
 
+        # --- Destination Address Autocomplete Search ---
+        lbl_dest_search = QLabel("DESTINATION ADDRESS OR PLACE", self)
+        lbl_dest_search.setProperty("class", "FieldLabel")
+        dc_layout.addWidget(lbl_dest_search)
+
+        self.dest_search_input = QLineEdit(self)
+        self.dest_search_input.setObjectName("AddressSearchInput")
+        self.dest_search_input.setPlaceholderText("Search destination address or place (e.g. Starbucks)...")
+        self.dest_search_input.setFixedHeight(34)
+        self.dest_search_input.textChanged.connect(self._on_dest_search_changed)
+        self.dest_search_input.returnPressed.connect(self._do_dest_search)
+        dc_layout.addWidget(self.dest_search_input)
+
+        # Destination suggestions dropdown
+        self.dest_suggestions_list = QListWidget(self)
+        self.dest_suggestions_list.setObjectName("AddressSuggestionsList")
+        self.dest_suggestions_list.setMaximumHeight(130)
+        self.dest_suggestions_list.setVisible(False)
+        self.dest_suggestions_list.itemClicked.connect(self._on_dest_suggestion_clicked)
+        dc_layout.addWidget(self.dest_suggestions_list)
+
+        # Confirmed destination feedback
+        self.lbl_dest_confirmed = QLabel("", self)
+        self.lbl_dest_confirmed.setStyleSheet("color: #38bdf8; font-size: 11px; font-weight: 500;")
+        self.lbl_dest_confirmed.setVisible(False)
+        dc_layout.addWidget(self.lbl_dest_confirmed)
+
         # Start & Destination Coordinates Grid
         coord_grid = QGridLayout()
         coord_grid.setSpacing(8)
@@ -108,12 +160,16 @@ class RouteWidget(QWidget):
         self.start_lat.setRange(-90.0, 90.0)
         self.start_lat.setDecimals(6)
         self.start_lat.setValue(37.334900)
+        self.start_lat.setFixedHeight(34)
+        self.start_lat.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         coord_grid.addWidget(self.start_lat, 1, 0)
 
         self.start_lon = QDoubleSpinBox(self)
         self.start_lon.setRange(-180.0, 180.0)
         self.start_lon.setDecimals(6)
         self.start_lon.setValue(-122.009020)
+        self.start_lon.setFixedHeight(34)
+        self.start_lon.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         coord_grid.addWidget(self.start_lon, 1, 1)
 
         lbl_d = QLabel("DESTINATION COORDS", self)
@@ -124,12 +180,18 @@ class RouteWidget(QWidget):
         self.dest_lat.setRange(-90.0, 90.0)
         self.dest_lat.setDecimals(6)
         self.dest_lat.setValue(37.352000)
+        self.dest_lat.setFixedHeight(34)
+        self.dest_lat.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+        self.dest_lat.valueChanged.connect(self._on_dest_coords_spin_changed)
         coord_grid.addWidget(self.dest_lat, 3, 0)
 
         self.dest_lon = QDoubleSpinBox(self)
         self.dest_lon.setRange(-180.0, 180.0)
         self.dest_lon.setDecimals(6)
         self.dest_lon.setValue(-122.015000)
+        self.dest_lon.setFixedHeight(34)
+        self.dest_lon.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+        self.dest_lon.valueChanged.connect(self._on_dest_coords_spin_changed)
         coord_grid.addWidget(self.dest_lon, 3, 1)
 
         dc_layout.addLayout(coord_grid)
@@ -138,6 +200,7 @@ class RouteWidget(QWidget):
         self.btn_set_dest_from_map = QPushButton("Use Selected Pin as Destination", self)
         self.btn_set_dest_from_map.setProperty("class", "SecondaryBtn")
         self.btn_set_dest_from_map.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_set_dest_from_map.setFixedHeight(32)
         dc_layout.addWidget(self.btn_set_dest_from_map)
 
         # GPX Option
@@ -221,15 +284,94 @@ class RouteWidget(QWidget):
         layout.addWidget(ctrl_card)
         layout.addStretch()
 
+    def _on_dest_search_changed(self, text: str):
+        cleaned = text.strip()
+        if len(cleaned) < 2:
+            self.dest_suggestions_list.clear()
+            self.dest_suggestions_list.setVisible(False)
+            return
+        self._search_timer.start()
+
+    def _do_dest_search(self):
+        query = self.dest_search_input.text().strip()
+        if len(query) < 2:
+            return
+
+        if self._search_thread and self._search_thread.isRunning():
+            self._search_thread.quit()
+            self._search_thread.wait()
+
+        self._search_thread = GeocodeSearchThread(query, self)
+        self._search_thread.sig_results.connect(self._on_dest_search_results)
+        self._search_thread.start()
+
+    def _on_dest_search_results(self, results: list):
+        self.dest_suggestions_list.clear()
+        if not results:
+            self.dest_suggestions_list.setVisible(False)
+            return
+
+        for item in results:
+            list_item = QListWidgetItem(f"📍 {item['name']}")
+            list_item.setToolTip(item["full_name"])
+            list_item.setData(Qt.ItemDataRole.UserRole, item)
+            self.dest_suggestions_list.addItem(list_item)
+
+        self.dest_suggestions_list.setVisible(True)
+
+    def _on_dest_suggestion_clicked(self, list_item: QListWidgetItem):
+        data = list_item.data(Qt.ItemDataRole.UserRole)
+        if not data:
+            return
+
+        self.dest_suggestions_list.setVisible(False)
+        self.dest_search_input.blockSignals(True)
+        self.dest_search_input.setText(data["name"])
+        self.dest_search_input.blockSignals(False)
+
+        lat = data["lat"]
+        lon = data["lon"]
+
+        self.dest_lat.blockSignals(True)
+        self.dest_lon.blockSignals(True)
+        self.dest_lat.setValue(lat)
+        self.dest_lon.setValue(lon)
+        self.dest_lat.blockSignals(False)
+        self.dest_lon.blockSignals(False)
+
+        self.lbl_dest_confirmed.setText(f"Confirmed on map: {data['name']}")
+        self.lbl_dest_confirmed.setVisible(True)
+
+        self.sig_destination_changed.emit(lat, lon)
+
+    def _on_dest_coords_spin_changed(self):
+        lat = self.dest_lat.value()
+        lon = self.dest_lon.value()
+        self.sig_destination_changed.emit(lat, lon)
+
     def set_start_location(self, lat: float, lon: float):
         self.start_lat.setValue(lat)
         self.start_lon.setValue(lon)
 
-    def set_destination(self, lat: float, lon: float):
+    def set_destination(self, lat: float, lon: float, name: Optional[str] = None):
+        self.dest_lat.blockSignals(True)
+        self.dest_lon.blockSignals(True)
         self.dest_lat.setValue(lat)
         self.dest_lon.setValue(lon)
+        self.dest_lat.blockSignals(False)
+        self.dest_lon.blockSignals(False)
+
+        if name:
+            self.dest_search_input.setText(name)
+            self.lbl_dest_confirmed.setText(f"Confirmed on map: {name}")
+            self.lbl_dest_confirmed.setVisible(True)
+        else:
+            self.lbl_dest_confirmed.setText(f"Destination pin set: ({lat:.4f}, {lon:.4f})")
+            self.lbl_dest_confirmed.setVisible(True)
+
         self.gpx_filepath = None
         self.lbl_gpx_name.setVisible(False)
+        self.sig_destination_changed.emit(lat, lon)
 
     def _set_speed(self, spd: float):
         self.speed_slider.setValue(int(spd))
