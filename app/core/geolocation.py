@@ -6,55 +6,16 @@ Detects user's actual physical location via high-accuracy IP geolocation.
 import json
 import logging
 import urllib.request
-from pathlib import Path
 from typing import Optional, Tuple
 
 logger = logging.getLogger("Geolocation")
 
-CONFIG_DIR = Path.home() / ".config" / "location_spoofer"
-CONFIG_FILE = CONFIG_DIR / "default_location.json"
-
-
-def get_saved_default_location() -> Optional[Tuple[float, float, str]]:
-    """Returns the user's saved real-life default location if one has been set."""
-    if CONFIG_FILE.exists():
-        try:
-            data = json.loads(CONFIG_FILE.read_text("utf-8"))
-            lat = float(data["lat"])
-            lon = float(data["lon"])
-            name = data.get("name", "My Default Location")
-            return lat, lon, name
-        except Exception as e:
-            logger.debug(f"Could not load saved location: {e}")
-    return None
-
-
-def save_default_location(lat: float, lon: float, name: str = "My Default Location") -> bool:
-    """Saves user's actual real-life coordinates as the permanent default."""
-    try:
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        CONFIG_FILE.write_text(json.dumps({
-            "lat": lat,
-            "lon": lon,
-            "name": name
-        }, indent=2), "utf-8")
-        logger.info(f"Saved real-life default location: {name} ({lat}, {lon})")
-        return True
-    except Exception as e:
-        logger.warning(f"Could not save default location: {e}")
-        return False
-
 
 def get_actual_location() -> Optional[Tuple[float, float, str]]:
     """
-    Queries user's saved location first, then falls back to IP geolocation.
+    Queries geolocation APIs to determine actual current physical position.
     Returns: (latitude, longitude, description) or None on failure.
     """
-    # 1. First priority: Check if user saved their exact real-life location
-    saved = get_saved_default_location()
-    if saved:
-        logger.info(f"Using saved real-life default location: {saved[2]} ({saved[0]}, {saved[1]})")
-        return saved
     providers = [
         (
             "https://ipapi.co/json/",
