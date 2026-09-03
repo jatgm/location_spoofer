@@ -4,7 +4,7 @@ and device selection controls.
 """
 
 from typing import Dict, List, Any, Optional
-from PyQt6.QtCore import pyqtSignal, Qt, QPropertyAnimation, QEasingCurve, QRect
+from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel,
     QComboBox, QPushButton, QFrame, QCheckBox
@@ -23,13 +23,13 @@ class StatusWidget(QWidget):
     STATUS_STYLES = {
         "NO_DEVICE": {
             "dot": "#8e8e93",
-            "text": "No iOS Device Connected",
+            "text": "No Device Connected",
             "bg": "rgba(142, 142, 147, 0.12)",
             "border": "rgba(142, 142, 147, 0.3)"
         },
         "CONNECTED": {
             "dot": "#30d158",
-            "text": "Device Connected & Ready",
+            "text": "Device Connected",
             "bg": "rgba(48, 209, 88, 0.12)",
             "border": "rgba(48, 209, 88, 0.35)"
         },
@@ -144,6 +144,8 @@ class StatusWidget(QWidget):
             f"border: none;"
         )
         self.state_label.setText(text)
+        self.state_label.adjustSize()
+        self.status_frame.adjustSize()
         self.state_label.setStyleSheet(
             f"color: {cfg['dot']}; "
             f"font-weight: 600; "
@@ -209,21 +211,9 @@ class StatusWidget(QWidget):
             self.set_status("CONNECTED")
 
             if was_empty:
-                self._animate_connect()
                 play_system_sound("Pop")
 
         self.combo_devices.blockSignals(False)
-
-    def _animate_connect(self):
-        """Dynamic Island style expanding spring animation on USB connect."""
-        anim = QPropertyAnimation(self.status_frame, b"geometry", self)
-        anim.setDuration(450)
-        anim.setEasingCurve(QEasingCurve.Type.OutBack)
-        orig_geo = self.status_frame.geometry()
-        start_geo = QRect(orig_geo.x(), orig_geo.y(), max(20, orig_geo.width() - 35), orig_geo.height())
-        anim.setStartValue(start_geo)
-        anim.setEndValue(orig_geo)
-        anim.start()
 
     def _on_device_combo_changed(self, index: int):
         data = self.combo_devices.itemData(index)
