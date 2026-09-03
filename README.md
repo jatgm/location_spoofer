@@ -1,5 +1,10 @@
 # iOS 17+ Location Spoofer (macOS Desktop App)
 
+[![Current Version](https://img.shields.io/badge/version-v1.3.1-0a84ff.svg)](https://github.com/jatgm/location_spoofer/releases)
+[![macOS Compatible](https://img.shields.io/badge/platform-macOS%2012%2B-lightgrey.svg)]()
+[![iOS Support](https://img.shields.io/badge/iOS-17.0%2B-blue.svg)]()
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A modern desktop application for macOS to simulate and spoof system-wide GPS locations on physical iPhones running **iOS 17 or later** (compatible with Apple Maps, Find My, and all CoreLocation-based apps).
 
 Built with **Python 3**, **PyQt6**, **QWebEngineView (Leaflet.js)**, and **pymobiledevice3**.
