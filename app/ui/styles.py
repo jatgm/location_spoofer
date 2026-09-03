@@ -177,11 +177,11 @@ QListWidget#AddressSuggestionsList::item:selected {
 QPushButton#KeepAwakeBtn {
     background-color: #161c28;
     border: 1px solid #2a3a54;
-    border-radius: 8px;
+    border-radius: 7px;
     color: #64748b;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
-    padding: 6px 14px;
+    padding: 5px 9px;
 }
 
 QPushButton#KeepAwakeBtn:hover {
@@ -258,9 +258,9 @@ QPushButton#EmergencyKillBtn {
     border: 1px solid rgba(255, 69, 58, 0.38);
     border-radius: 7px;
     color: #ff453a;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
-    padding: 6px 12px;
+    padding: 5px 9px;
 }
 
 QPushButton#EmergencyKillBtn:hover {
@@ -279,9 +279,9 @@ QPushButton#SoundToggleBtn {
     border: 1px solid #282f3f;
     border-radius: 7px;
     color: #94a3b8;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
-    padding: 6px 10px;
+    padding: 5px 8px;
 }
 
 QPushButton#SoundToggleBtn:hover {
@@ -374,8 +374,9 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
 QComboBox {
     background-color: #161922;
     border: 1px solid #282e3f;
-    border-radius: 8px;
-    padding: 6px 12px;
+    border-radius: 7px;
+    padding: 4px 8px;
+    font-size: 11px;
     color: #f1f5f9;
     font-weight: 500;
 }

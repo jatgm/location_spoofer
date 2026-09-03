@@ -93,3 +93,9 @@ class MapWidget(QWidget):
         """Removes the route polyline from the map."""
         script = "if (window.clearRoute) { window.clearRoute(); }"
         self.web_view.page().runJavaScript(script)
+
+    def set_marker_active(self, active: bool):
+        """Sets the marker radar state: True = active green with radar, False = idle gray without radar."""
+        act_str = "true" if active else "false"
+        script = f"if (window.setMarkerActive) {{ window.setMarkerActive({act_str}); }}"
+        self.web_view.page().runJavaScript(script)

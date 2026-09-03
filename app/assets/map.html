@@ -53,65 +53,6 @@
       color: #60a5fa !important;
     }
 
-    /* Floating Search Bar */
-    .search-container {
-      position: absolute;
-      top: 14px;
-      left: 60px;
-      z-index: 1000;
-      display: flex;
-      align-items: center;
-      background: rgba(24, 27, 36, 0.85);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 10px;
-      padding: 4px 8px;
-      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
-      width: 290px;
-      transition: all 0.2s ease;
-    }
-
-    .search-container:focus-within {
-      border-color: #0a84ff;
-      box-shadow: 0 4px 20px rgba(10, 132, 255, 0.25);
-    }
-
-    .search-icon {
-      width: 16px;
-      height: 16px;
-      fill: #8e95a5;
-      margin-right: 8px;
-      flex-shrink: 0;
-    }
-
-    .search-input {
-      background: transparent;
-      border: none;
-      outline: none;
-      color: #fff;
-      font-size: 13px;
-      width: 100%;
-    }
-
-    .search-input::placeholder {
-      color: #6c7385;
-    }
-
-    .search-spinner {
-      display: none;
-      width: 14px;
-      height: 14px;
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      border-top-color: #0a84ff;
-      border-radius: 50%;
-      animation: spin 0.6s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
     /* Floating Coordinate Pill */
     .coord-badge {
       position: absolute;
@@ -140,46 +81,94 @@
       font-weight: 600;
     }
 
-    /* Custom Radar Pulse Pin */
+    /* Floating Center Button */
+    .center-btn {
+      position: absolute;
+      bottom: 20px;
+      right: 16px;
+      z-index: 1000;
+      background: rgba(20, 23, 31, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      color: #cbd5e1;
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+      transition: all 0.2s ease;
+    }
+
+    .center-btn:hover {
+      background: #222736;
+      color: #38bdf8;
+      border-color: #38bdf8;
+      box-shadow: 0 4px 18px rgba(56, 189, 248, 0.25);
+    }
+
+    .center-btn:active {
+      transform: scale(0.96);
+    }
+
+    /* Custom Pin Styles */
     .pulse-marker-icon {
       position: relative;
     }
 
-    .pin-pulse {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(56, 189, 248, 0.5) 0%, rgba(10, 132, 255, 0.2) 65%, transparent 100%);
-      position: absolute;
-      top: -20px;
-      left: -20px;
-      animation: pulsate 2.0s infinite cubic-bezier(0.1, 0.7, 0.1, 1);
-      pointer-events: none;
-    }
-
-    .pin-pulse-2 {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      border: 1.5px solid rgba(56, 189, 248, 0.6);
-      position: absolute;
-      top: -20px;
-      left: -20px;
-      animation: pulsateRing 2.0s infinite 1.0s cubic-bezier(0.1, 0.7, 0.1, 1);
-      pointer-events: none;
-    }
-
+    /* Idle / Inactive: gray pin, NO radar rings */
     .pin-dot {
       width: 14px;
       height: 14px;
       border-radius: 50%;
-      background: #0a84ff;
+      background: #8e8e93;
       border: 2.5px solid #ffffff;
       position: absolute;
       top: -7px;
       left: -7px;
-      box-shadow: 0 0 12px rgba(10, 132, 255, 0.9), 0 0 4px rgba(255, 255, 255, 0.8);
-      transition: transform 0.15s ease-out;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+      transition: background 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .pin-pulse, .pin-pulse-2 {
+      display: none;
+    }
+
+    /* Active & Running: green pin WITH pulsing green radar */
+    .active-radar .pin-dot {
+      background: #30d158 !important;
+      box-shadow: 0 0 12px rgba(48, 209, 88, 0.95), 0 0 4px rgba(255, 255, 255, 0.9) !important;
+    }
+
+    .active-radar .pin-pulse {
+      display: block !important;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(48, 209, 88, 0.5) 0%, rgba(48, 209, 88, 0.15) 65%, transparent 100%) !important;
+      position: absolute;
+      top: -21px;
+      left: -21px;
+      animation: pulsate 2.0s infinite cubic-bezier(0.1, 0.7, 0.1, 1);
+      pointer-events: none;
+    }
+
+    .active-radar .pin-pulse-2 {
+      display: block !important;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(48, 209, 88, 0.6) !important;
+      position: absolute;
+      top: -21px;
+      left: -21px;
+      animation: pulsateRing 2.0s infinite 1.0s cubic-bezier(0.1, 0.7, 0.1, 1);
+      pointer-events: none;
     }
 
     @keyframes pulsate {
@@ -231,20 +220,23 @@
 </head>
 <body>
 
-  <!-- Floating Search -->
-  <div class="search-container">
-    <svg class="search-icon" viewBox="0 0 24 24">
-      <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-    </svg>
-    <input type="text" id="searchInput" class="search-input" placeholder="Search city, address or landmark..." />
-    <div id="searchSpinner" class="search-spinner"></div>
-  </div>
-
   <!-- Coordinates display -->
   <div class="coord-badge" id="coordBadge">
     <div>LAT: <span class="val" id="latVal">37.334900</span></div>
     <div>LON: <span class="val" id="lonVal">-122.009020</span></div>
   </div>
+
+  <!-- Floating Center Button -->
+  <button id="centerBtn" class="center-btn" title="Center on Target Pin" onclick="centerOnPin()">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="7"></circle>
+      <line x1="12" y1="1" x2="12" y2="5"></line>
+      <line x1="12" y1="19" x2="12" y2="23"></line>
+      <line x1="1" y1="12" x2="5" y2="12"></line>
+      <line x1="19" y1="12" x2="23" y2="12"></line>
+    </svg>
+    <span>Center</span>
+  </button>
 
   <!-- Map Container -->
   <div id="map"></div>
@@ -408,36 +400,24 @@
       }
     };
 
-    // Geocoding Search via OpenStreetMap Nominatim
-    var searchInput = document.getElementById('searchInput');
-    var searchSpinner = document.getElementById('searchSpinner');
+    // Center map view on target pin
+    window.centerOnPin = function() {
+      map.panTo([currentLat, currentLon], { animate: true, duration: 0.6 });
+    };
 
-    searchInput.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') {
-        var query = searchInput.value.trim();
-        if (!query) return;
-
-        searchSpinner.style.display = 'block';
-        var url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query);
-
-        fetch(url, { headers: { 'Accept': 'application/json' } })
-          .then(function(res) { return res.json(); })
-          .then(function(data) {
-            searchSpinner.style.display = 'none';
-            if (data && data.length > 0) {
-              var item = data[0];
-              var lat = parseFloat(item.lat);
-              var lon = parseFloat(item.lon);
-              updateLocation(lat, lon, true);
-              map.flyTo([lat, lon], 15, { duration: 1.2 });
-            }
-          })
-          .catch(function(err) {
-            searchSpinner.style.display = 'none';
-            console.error("Geocoding failed:", err);
-          });
+    // Toggle active marker state (idle gray vs active green radar)
+    window._isMarkerActive = false;
+    window.setMarkerActive = function(active) {
+      window._isMarkerActive = !!active;
+      var el = marker.getElement();
+      if (el) {
+        if (active) {
+          el.classList.add('active-radar');
+        } else {
+          el.classList.remove('active-radar');
+        }
       }
-    });
+    };
   </script>
 </body>
 </html>

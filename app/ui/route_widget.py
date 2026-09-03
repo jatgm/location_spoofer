@@ -113,29 +113,152 @@ class RouteWidget(QWidget):
         sc_layout.addLayout(slider_row)
         layout.addWidget(speed_card)
 
-        # 2. Destination Waypoints Card
+        # 2. Google Maps Directions Card
         dest_card = QFrame(self)
         dest_card.setProperty("class", "CardPanel")
         dc_layout = QVBoxLayout(dest_card)
         dc_layout.setContentsMargins(14, 14, 14, 14)
         dc_layout.setSpacing(10)
 
-        dest_title = QLabel("Route Destination", self)
-        dest_title.setProperty("class", "SectionTitle")
-        dc_layout.addWidget(dest_title)
+        # Top Modes Row ("Best", "Drive", "Bike", "Walk", "Express")
+        mode_row = QHBoxLayout()
+        mode_row.setSpacing(8)
 
-        # --- Destination Address Autocomplete Search ---
-        lbl_dest_search = QLabel("DESTINATION ADDRESS OR PLACE", self)
-        lbl_dest_search.setProperty("class", "FieldLabel")
-        dc_layout.addWidget(lbl_dest_search)
+        lbl_best = QLabel("Best", self)
+        lbl_best.setStyleSheet("color: #38bdf8; font-weight: 700; font-size: 13px; margin-right: 4px;")
+        mode_row.addWidget(lbl_best)
+
+        for mode_title, spd in [("Drive", 50.0), ("Bike", 20.0), ("Walk", 5.0), ("Express", 80.0)]:
+            btn_m = QPushButton(mode_title, self)
+            btn_m.setProperty("class", "PresetBtn")
+            btn_m.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_m.clicked.connect(lambda checked, s=spd: self._set_speed(s))
+            mode_row.addWidget(btn_m)
+        mode_row.addStretch()
+        dc_layout.addLayout(mode_row)
+
+        # Google Maps Directions Box: Left icons, Middle inputs, Right reverse button
+        dir_frame = QFrame(self)
+        dir_frame.setStyleSheet("""
+            QFrame {
+                background: #141721;
+                border: 1px solid #282f42;
+                border-radius: 12px;
+            }
+        """)
+        dir_layout = QHBoxLayout(dir_frame)
+        dir_layout.setContentsMargins(12, 12, 12, 12)
+        dir_layout.setSpacing(10)
+
+        # Left Icon Column: ○  ⋮  📍
+        icon_col = QVBoxLayout()
+        icon_col.setContentsMargins(0, 0, 0, 0)
+        icon_col.setSpacing(2)
+        icon_col.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        lbl_origin_dot = QLabel("○", self)
+        lbl_origin_dot.setStyleSheet("color: #94a3b8; font-size: 16px; font-weight: bold; background: transparent; border: none;")
+        icon_col.addWidget(lbl_origin_dot, 0, Qt.AlignmentFlag.AlignCenter)
+
+        lbl_dots = QLabel("⋮", self)
+        lbl_dots.setStyleSheet("color: #64748b; font-size: 14px; font-weight: bold; background: transparent; border: none;")
+        icon_col.addWidget(lbl_dots, 0, Qt.AlignmentFlag.AlignCenter)
+
+        lbl_dest_pin = QLabel("📍", self)
+        lbl_dest_pin.setStyleSheet("color: #ef4444; font-size: 15px; background: transparent; border: none;")
+        icon_col.addWidget(lbl_dest_pin, 0, Qt.AlignmentFlag.AlignCenter)
+
+        dir_layout.addLayout(icon_col)
+
+        # Middle Inputs Column: Start (Your location) & Destination
+        inputs_col = QVBoxLayout()
+        inputs_col.setContentsMargins(0, 0, 0, 0)
+        inputs_col.setSpacing(8)
+
+        self.start_search_input = QLineEdit("Your location", self)
+        self.start_search_input.setStyleSheet("""
+            QLineEdit {
+                background: #1b202c;
+                border: 1px solid #333d52;
+                border-radius: 8px;
+                padding: 6px 12px;
+                color: #f1f5f9;
+                font-size: 13px;
+            }
+            QLineEdit:focus {
+                border-color: #38bdf8;
+            }
+        """)
+        inputs_col.addWidget(self.start_search_input)
 
         self.dest_search_input = QLineEdit(self)
-        self.dest_search_input.setObjectName("AddressSearchInput")
         self.dest_search_input.setPlaceholderText("Search destination address or place (e.g. Starbucks)...")
-        self.dest_search_input.setFixedHeight(34)
+        self.dest_search_input.setStyleSheet("""
+            QLineEdit {
+                background: #1b202c;
+                border: 1px solid #333d52;
+                border-radius: 8px;
+                padding: 6px 12px;
+                color: #f1f5f9;
+                font-size: 13px;
+            }
+            QLineEdit:focus {
+                border-color: #38bdf8;
+            }
+        """)
         self.dest_search_input.textChanged.connect(self._on_dest_search_changed)
         self.dest_search_input.returnPressed.connect(self._do_dest_search)
-        dc_layout.addWidget(self.dest_search_input)
+        inputs_col.addWidget(self.dest_search_input)
+
+        dir_layout.addLayout(inputs_col, 1)
+
+        # Right Swap Column: Centered Reverse Button ⇅
+        swap_col = QVBoxLayout()
+        swap_col.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.btn_reverse_route = QPushButton("⇅", self)
+        self.btn_reverse_route.setFixedSize(34, 34)
+        self.btn_reverse_route.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_reverse_route.setToolTip("Reverse direction (swap start & destination)")
+        self.btn_reverse_route.setStyleSheet("""
+            QPushButton {
+                background: #1e2432;
+                border: 1px solid #323d53;
+                border-radius: 17px;
+                color: #cbd5e1;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: #283246;
+                color: #38bdf8;
+                border-color: #38bdf8;
+            }
+        """)
+        self.btn_reverse_route.clicked.connect(self._on_reverse_route_clicked)
+        swap_col.addWidget(self.btn_reverse_route)
+
+        dir_layout.addLayout(swap_col)
+        dc_layout.addWidget(dir_frame)
+
+        # Add destination clickable button row (+ Add destination)
+        self.btn_add_dest = QPushButton("⊕  Add destination", self)
+        self.btn_add_dest.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_add_dest.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: none;
+                color: #94a3b8;
+                font-size: 12px;
+                font-weight: 500;
+                text-align: left;
+                padding: 4px 0px;
+            }
+            QPushButton:hover {
+                color: #38bdf8;
+            }
+        """)
+        self.btn_add_dest.clicked.connect(lambda: self.dest_search_input.setFocus())
+        dc_layout.addWidget(self.btn_add_dest)
 
         # Destination suggestions dropdown
         self.dest_suggestions_list = QListWidget(self)
@@ -151,94 +274,54 @@ class RouteWidget(QWidget):
         self.lbl_dest_confirmed.setVisible(False)
         dc_layout.addWidget(self.lbl_dest_confirmed)
 
-        # Start & Destination Coordinates Grid
-        coord_grid = QGridLayout()
-        coord_grid.setSpacing(8)
-
-        lbl_s = QLabel("START COORDS (Current)", self)
-        lbl_s.setProperty("class", "FieldLabel")
-        coord_grid.addWidget(lbl_s, 0, 0, 1, 2)
-
+        # Hidden Spinboxes (preserves full simulator API compatibility)
+        self.coord_container = QWidget(self)
+        self.coord_container.setVisible(False)
+        cc_box = QHBoxLayout(self.coord_container)
         self.start_lat = QDoubleSpinBox(self)
         self.start_lat.setRange(-90.0, 90.0)
-        self.start_lat.setDecimals(6)
         self.start_lat.setValue(37.334900)
-        self.start_lat.setFixedHeight(34)
-        self.start_lat.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
-        coord_grid.addWidget(self.start_lat, 1, 0)
-
         self.start_lon = QDoubleSpinBox(self)
         self.start_lon.setRange(-180.0, 180.0)
-        self.start_lon.setDecimals(6)
         self.start_lon.setValue(-122.009020)
-        self.start_lon.setFixedHeight(34)
-        self.start_lon.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
-        coord_grid.addWidget(self.start_lon, 1, 1)
-
-        lbl_d = QLabel("DESTINATION COORDS", self)
-        lbl_d.setProperty("class", "FieldLabel")
-        coord_grid.addWidget(lbl_d, 2, 0, 1, 2)
-
         self.dest_lat = QDoubleSpinBox(self)
         self.dest_lat.setRange(-90.0, 90.0)
-        self.dest_lat.setDecimals(6)
         self.dest_lat.setValue(37.352000)
-        self.dest_lat.setFixedHeight(34)
-        self.dest_lat.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
-        self.dest_lat.valueChanged.connect(self._on_dest_coords_spin_changed)
-        coord_grid.addWidget(self.dest_lat, 3, 0)
-
         self.dest_lon = QDoubleSpinBox(self)
         self.dest_lon.setRange(-180.0, 180.0)
-        self.dest_lon.setDecimals(6)
         self.dest_lon.setValue(-122.015000)
-        self.dest_lon.setFixedHeight(34)
-        self.dest_lon.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
-        self.dest_lon.valueChanged.connect(self._on_dest_coords_spin_changed)
-        coord_grid.addWidget(self.dest_lon, 3, 1)
+        cc_box.addWidget(self.start_lat)
+        cc_box.addWidget(self.start_lon)
+        cc_box.addWidget(self.dest_lat)
+        cc_box.addWidget(self.dest_lon)
+        dc_layout.addWidget(self.coord_container)
 
-        dc_layout.addLayout(coord_grid)
-
-        # Row: Reverse Route & Use Selected Pin
+        # Quick Actions: Use Map Pin, Load GPX, Export GPX
         dest_action_row = QHBoxLayout()
         dest_action_row.setSpacing(8)
 
-        self.btn_reverse_route = QPushButton("⇄ Reverse Route", self)
-        self.btn_reverse_route.setProperty("class", "SecondaryBtn")
-        self.btn_reverse_route.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_reverse_route.setFixedHeight(32)
-        self.btn_reverse_route.setToolTip("Swaps Start and Destination to travel back along the same path")
-        self.btn_reverse_route.clicked.connect(self._on_reverse_route_clicked)
-        dest_action_row.addWidget(self.btn_reverse_route, 1)
-
-        self.btn_set_dest_from_map = QPushButton("Use Selected Pin", self)
+        self.btn_set_dest_from_map = QPushButton("Use Map Pin", self)
         self.btn_set_dest_from_map.setProperty("class", "SecondaryBtn")
         self.btn_set_dest_from_map.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_set_dest_from_map.setFixedHeight(32)
-        dest_action_row.addWidget(self.btn_set_dest_from_map, 1)
-
-        dc_layout.addLayout(dest_action_row)
-
-        # Row: Load GPX & Export Route as GPX
-        gpx_row = QHBoxLayout()
-        gpx_row.setSpacing(8)
+        self.btn_set_dest_from_map.setFixedHeight(30)
+        dest_action_row.addWidget(self.btn_set_dest_from_map)
 
         self.btn_load_gpx = QPushButton("Load GPX...", self)
         self.btn_load_gpx.setProperty("class", "SecondaryBtn")
         self.btn_load_gpx.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_load_gpx.setFixedHeight(32)
+        self.btn_load_gpx.setFixedHeight(30)
         self.btn_load_gpx.clicked.connect(self._on_load_gpx_clicked)
-        gpx_row.addWidget(self.btn_load_gpx, 1)
+        dest_action_row.addWidget(self.btn_load_gpx)
 
         self.btn_export_gpx = QPushButton("Export GPX...", self)
         self.btn_export_gpx.setProperty("class", "SecondaryBtn")
         self.btn_export_gpx.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_export_gpx.setFixedHeight(32)
-        self.btn_export_gpx.setToolTip("Export current calculated road route into a .gpx track file")
+        self.btn_export_gpx.setFixedHeight(30)
+        self.btn_export_gpx.setToolTip("Export current route as GPX file")
         self.btn_export_gpx.clicked.connect(self._on_export_gpx_clicked)
-        gpx_row.addWidget(self.btn_export_gpx, 1)
+        dest_action_row.addWidget(self.btn_export_gpx)
 
-        dc_layout.addLayout(gpx_row)
+        dc_layout.addLayout(dest_action_row)
 
         self.lbl_gpx_name = QLabel("", self)
         self.lbl_gpx_name.setStyleSheet("color: #38bdf8; font-size: 11px;")
@@ -393,6 +476,8 @@ class RouteWidget(QWidget):
     def set_start_location(self, lat: float, lon: float):
         self.start_lat.setValue(lat)
         self.start_lon.setValue(lon)
+        if not self.start_search_input.text() or self.start_search_input.text() == "Your location":
+            self.start_search_input.setText("Your location")
 
     def set_destination(self, lat: float, lon: float, name: Optional[str] = None):
         self.dest_lat.blockSignals(True)
@@ -402,13 +487,10 @@ class RouteWidget(QWidget):
         self.dest_lat.blockSignals(False)
         self.dest_lon.blockSignals(False)
 
-        if name:
-            self.dest_search_input.setText(name)
-            self.lbl_dest_confirmed.setText(f"Confirmed on map: {name}")
-            self.lbl_dest_confirmed.setVisible(True)
-        else:
-            self.lbl_dest_confirmed.setText(f"Destination pin set: ({lat:.4f}, {lon:.4f})")
-            self.lbl_dest_confirmed.setVisible(True)
+        display_name = name or f"{lat:.4f}, {lon:.4f}"
+        self.dest_search_input.setText(display_name)
+        self.lbl_dest_confirmed.setText(f"Confirmed on map: {display_name}")
+        self.lbl_dest_confirmed.setVisible(True)
 
         self.gpx_filepath = None
         self.lbl_gpx_name.setVisible(False)
@@ -445,6 +527,12 @@ class RouteWidget(QWidget):
         s_lon = self.start_lon.value()
         d_lat = self.dest_lat.value()
         d_lon = self.dest_lon.value()
+
+        # Swap inputs text
+        s_text = self.start_search_input.text()
+        d_text = self.dest_search_input.text()
+        self.start_search_input.setText(d_text if d_text else f"{d_lat:.4f}, {d_lon:.4f}")
+        self.dest_search_input.setText(s_text if s_text else "Your location")
 
         self.start_lat.blockSignals(True)
         self.start_lon.blockSignals(True)

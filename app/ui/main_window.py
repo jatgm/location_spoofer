@@ -103,9 +103,10 @@ class MainWindow(QMainWindow):
 
         main_splitter.addWidget(right_splitter)
 
-        # Proportions overall: 58% Map on left, 42% Controls & Console on right
-        main_splitter.setStretchFactor(0, 58)
-        main_splitter.setStretchFactor(1, 42)
+        # Proportions overall: 68% Map on left, 32% Controls & Console on right (more open map)
+        main_splitter.setStretchFactor(0, 68)
+        main_splitter.setStretchFactor(1, 32)
+        main_splitter.setSizes([820, 380])
 
         main_layout.addWidget(main_splitter, 1)
 
@@ -152,9 +153,12 @@ class MainWindow(QMainWindow):
 
         # Worker Route Updates -> Map & Route Panel
         self.worker.sig_route_started.connect(self.map_widget.draw_route)
+        self.worker.sig_route_started.connect(lambda: self.map_widget.set_marker_active(True))
         self.worker.sig_route_progress.connect(self._on_route_progress)
         self.worker.sig_route_finished.connect(self._on_route_finished)
         self.worker.sig_route_stopped.connect(self.map_widget.clear_route)
+        self.worker.sig_route_stopped.connect(lambda: self.map_widget.set_marker_active(False))
+        self.status_widget.sig_emergency_kill_clicked.connect(lambda: self.map_widget.set_marker_active(False))
 
     def _on_tab_changed(self, index: int):
         if index == 1:
@@ -241,14 +245,17 @@ class MainWindow(QMainWindow):
 
     def _on_spoof_success(self, lat: float, lon: float):
         self.controls_widget.set_spoofing_state(True)
+        self.map_widget.set_marker_active(True)
         self.status_widget.set_status("SPOOFING", f"Active GPS Spoof: ({lat:.4f}, {lon:.4f})")
 
     def _on_clear_success(self):
         self.controls_widget.set_spoofing_state(False)
+        self.map_widget.set_marker_active(False)
         self.status_widget.set_status("CONNECTED", "Physical GPS Restored")
 
     def _on_device_disconnected(self):
         self.controls_widget.set_spoofing_state(False)
+        self.map_widget.set_marker_active(False)
         self.status_widget.set_status("NO_DEVICE", "iOS Device Disconnected")
         self.log_widget.append_log("WARN", "USB connection dropped! Physical GPS restored.")
         send_macos_notification(

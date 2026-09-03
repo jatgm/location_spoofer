@@ -61,37 +61,38 @@ class StatusWidget(QWidget):
 
     def _init_ui(self):
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(14)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(8)
 
         # Status Pill
         self.status_frame = QFrame(self)
         self.status_frame.setObjectName("StatusPill")
         pill_layout = QHBoxLayout(self.status_frame)
-        pill_layout.setContentsMargins(12, 6, 14, 6)
-        pill_layout.setSpacing(8)
+        pill_layout.setContentsMargins(10, 5, 12, 5)
+        pill_layout.setSpacing(7)
 
-        # Clean circular dot indicator (no text glyph / border artifacts)
+        # Clean circular dot indicator
         self.dot = QFrame(self.status_frame)
         self.dot.setFixedSize(8, 8)
         pill_layout.addWidget(self.dot)
 
         self.state_label = QLabel("Scanning USB...", self.status_frame)
-        self.state_label.setStyleSheet("border: none; background: transparent; font-weight: 600; font-size: 13px;")
+        self.state_label.setStyleSheet("border: none; background: transparent; font-weight: 600; font-size: 12px;")
         pill_layout.addWidget(self.state_label)
 
         layout.addWidget(self.status_frame)
 
-        # Device Details Label
-        self.device_info_label = QLabel("Connect an iPhone running iOS 17+ via USB", self)
-        self.device_info_label.setStyleSheet("color: #8b95a5; font-size: 12px; font-weight: 500;")
+        # Device Details Label (compact battery & connection indicator)
+        self.device_info_label = QLabel("", self)
+        self.device_info_label.setStyleSheet("color: #94a3b8; font-size: 12px; font-weight: 500;")
         layout.addWidget(self.device_info_label)
 
         layout.addStretch()
 
-        # Device Selector Combo (Generous width to prevent any text clipping)
+        # Device Selector Combo
         self.combo_devices = QComboBox(self)
-        self.combo_devices.setMinimumWidth(320)
+        self.combo_devices.setMinimumWidth(160)
+        self.combo_devices.setMaximumWidth(220)
         self.combo_devices.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         self.combo_devices.currentIndexChanged.connect(self._on_device_combo_changed)
         layout.addWidget(self.combo_devices)
@@ -104,17 +105,17 @@ class StatusWidget(QWidget):
         layout.addWidget(self.btn_refresh)
 
         # Sound Toggle Button
-        self.btn_sound = QPushButton("Sound: ON", self)
+        self.btn_sound = QPushButton("🔊 Sound", self)
         self.btn_sound.setObjectName("SoundToggleBtn")
         self.btn_sound.setCheckable(True)
         self.btn_sound.setChecked(True)
         self.btn_sound.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_sound.setToolTip("Toggle macOS system sound effects")
+        self.btn_sound.setToolTip("Toggle macOS sound effects")
         self.btn_sound.toggled.connect(self._on_sound_toggled)
         layout.addWidget(self.btn_sound)
 
         # Keep Awake Toggle Button
-        self.btn_keep_awake = QPushButton("Keep Awake: ON", self)
+        self.btn_keep_awake = QPushButton("☕ Awake: ON", self)
         self.btn_keep_awake.setObjectName("KeepAwakeBtn")
         self.btn_keep_awake.setCheckable(True)
         self.btn_keep_awake.setChecked(True)
@@ -124,7 +125,7 @@ class StatusWidget(QWidget):
         layout.addWidget(self.btn_keep_awake)
 
         # Emergency Kill Switch Button
-        self.btn_emergency_kill = QPushButton("Emergency Reset", self)
+        self.btn_emergency_kill = QPushButton("🛑 Reset", self)
         self.btn_emergency_kill.setObjectName("EmergencyKillBtn")
         self.btn_emergency_kill.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_emergency_kill.setToolTip("Immediately restores device physical GPS and closes tunnels")
@@ -135,14 +136,11 @@ class StatusWidget(QWidget):
 
     def _on_sound_toggled(self, checked: bool):
         set_sound_enabled(checked)
-        self.btn_sound.setText("Sound: ON" if checked else "Sound: OFF")
+        self.btn_sound.setText("🔊 Sound" if checked else "🔇 Muted")
         self.sig_sound_toggled.emit(checked)
 
     def _on_keep_awake_toggled(self, checked: bool):
-        if checked:
-            self.btn_keep_awake.setText("Keep Awake: ON")
-        else:
-            self.btn_keep_awake.setText("Keep Awake: OFF")
+        self.btn_keep_awake.setText("☕ Awake: ON" if checked else "☕ Awake: OFF")
         self.sig_keep_awake_toggled.emit(checked)
 
     def set_status(self, status_key: str, custom_text: Optional[str] = None):
@@ -158,19 +156,15 @@ class StatusWidget(QWidget):
         self.state_label.setStyleSheet(
             f"color: {cfg['dot']}; "
             f"font-weight: 600; "
-            f"font-size: 13px; "
+            f"font-size: 12px; "
             f"border: none; "
             f"background: transparent;"
         )
         self.status_frame.setStyleSheet(
             f"QFrame#StatusPill {{ "
-            f"  background-color: {cfg['bg']}; "
-            f"  border: 1px solid {cfg['border']}; "
-            f"  border-radius: 15px; "
-            f"}} "
-            f"QFrame#StatusPill QLabel {{ "
-            f"  border: none; "
-            f"  background: transparent; "
+            f"background-color: {cfg['bg']}; "
+            f"border: 1px solid {cfg['border']}; "
+            f"border-radius: 8px; "
             f"}}"
         )
 
@@ -201,7 +195,7 @@ class StatusWidget(QWidget):
         if not devices:
             self.combo_devices.addItem("No devices found", None)
             self.combo_devices.setEnabled(False)
-            self.device_info_label.setText("Connect an iPhone running iOS 17+ via USB")
+            self.device_info_label.setText("")
             self.set_status("NO_DEVICE")
         else:
             for dev in devices:
@@ -217,10 +211,10 @@ class StatusWidget(QWidget):
             self.combo_devices.setEnabled(True)
 
             primary = devices[0]
-            batt_str = f"🔋 {primary['battery_level']}% • " if primary.get("battery_level") is not None else ""
-            self.device_info_label.setText(
-                f"{batt_str}UDID: {primary['udid'][:12]}... • {primary['connection_type']} • iOS {primary['version']}"
-            )
+            batt_str = f"🔋 {primary['battery_level']}%" if primary.get("battery_level") is not None else ""
+            conn_str = primary.get("connection_type", "USB")
+            info_parts = [p for p in [batt_str, conn_str] if p]
+            self.device_info_label.setText(" • ".join(info_parts))
             self.set_status("CONNECTED")
 
             if was_empty:
@@ -243,8 +237,8 @@ class StatusWidget(QWidget):
     def _on_device_combo_changed(self, index: int):
         data = self.combo_devices.itemData(index)
         if data and isinstance(data, dict):
-            batt_str = f"🔋 {data['battery_level']}% • " if data.get("battery_level") is not None else ""
-            self.device_info_label.setText(
-                f"{batt_str}UDID: {data['udid'][:12]}... • {data['connection_type']} • iOS {data['version']}"
-            )
+            batt_str = f"🔋 {data['battery_level']}%" if data.get("battery_level") is not None else ""
+            conn_str = data.get("connection_type", "USB")
+            info_parts = [p for p in [batt_str, conn_str] if p]
+            self.device_info_label.setText(" • ".join(info_parts))
             self.sig_device_selected.emit(data["udid"], data.get("is_ios17_plus", True))
