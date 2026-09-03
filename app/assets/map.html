@@ -242,8 +242,11 @@
       attributionControl: false
     }).setView([currentLat, currentLon], 14);
 
-    // Google Maps Standard Road Map Tile Layer (Fast, crisp road map with subdomains mt0-mt3)
-    var tiles = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+    // Google Maps High-Resolution Retina Road Map Layer (scale=2 for sharp 512px Retina text & roads)
+    var isRetina = (window.devicePixelRatio && window.devicePixelRatio > 1) || true;
+    var tileUrl = 'https://{s}.google.com/vt/lyrs=m&hl=en&scale=2&x={x}&y={y}&z={z}';
+
+    var tiles = L.tileLayer(tileUrl, {
       maxZoom: 20,
       subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
     }).addTo(map);
