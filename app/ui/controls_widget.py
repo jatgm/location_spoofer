@@ -97,12 +97,6 @@ class ControlsWidget(QWidget):
         self.suggestions_list.itemClicked.connect(self._on_suggestion_clicked)
         card_layout.addWidget(self.suggestions_list)
 
-        # Confirmed address feedback
-        self.lbl_confirmed = QLabel("", self)
-        self.lbl_confirmed.setStyleSheet("color: #38bdf8; font-size: 11px; font-weight: 500;")
-        self.lbl_confirmed.setVisible(False)
-        card_layout.addWidget(self.lbl_confirmed)
-
         # --- Manual Numeric Inputs ---
         lbl_coords = QLabel("MANUAL COORDINATES", self)
         lbl_coords.setProperty("class", "FieldLabel")
@@ -268,9 +262,6 @@ class ControlsWidget(QWidget):
         lon = data["lon"]
 
         self.set_coordinates(lat, lon)
-        self.lbl_confirmed.setText(f"Confirmed on map: {data['name']}")
-        self.lbl_confirmed.setVisible(True)
-
         # Notify MainWindow to move the Leaflet map and position the pin
         self.sig_coords_changed.emit(lat, lon)
 

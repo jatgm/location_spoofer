@@ -123,7 +123,6 @@ class MainWindow(QMainWindow):
         self.status_widget.sig_refresh_clicked.connect(self.worker.refresh_devices_now)
         self.status_widget.sig_device_selected.connect(self.worker.set_target_device)
         self.status_widget.sig_keep_awake_toggled.connect(self._on_keep_awake_toggled)
-        self.status_widget.sig_emergency_kill_clicked.connect(self.worker.emergency_kill_now)
 
         # Tab switching
         self.tabs.currentChanged.connect(self._on_tab_changed)
@@ -158,7 +157,6 @@ class MainWindow(QMainWindow):
         self.worker.sig_route_finished.connect(self._on_route_finished)
         self.worker.sig_route_stopped.connect(self.map_widget.clear_route)
         self.worker.sig_route_stopped.connect(lambda: self.map_widget.set_marker_active(False))
-        self.status_widget.sig_emergency_kill_clicked.connect(lambda: self.map_widget.set_marker_active(False))
 
     def _on_tab_changed(self, index: int):
         if index == 1:

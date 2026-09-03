@@ -19,7 +19,6 @@ class StatusWidget(QWidget):
     sig_refresh_clicked = pyqtSignal()
     sig_keep_awake_toggled = pyqtSignal(bool)
     sig_sound_toggled = pyqtSignal(bool)
-    sig_emergency_kill_clicked = pyqtSignal()
 
     STATUS_STYLES = {
         "NO_DEVICE": {
@@ -105,7 +104,7 @@ class StatusWidget(QWidget):
         layout.addWidget(self.btn_refresh)
 
         # Sound Toggle Button
-        self.btn_sound = QPushButton("🔊 Sound", self)
+        self.btn_sound = QPushButton("Sound: ON", self)
         self.btn_sound.setObjectName("SoundToggleBtn")
         self.btn_sound.setCheckable(True)
         self.btn_sound.setChecked(True)
@@ -115,7 +114,7 @@ class StatusWidget(QWidget):
         layout.addWidget(self.btn_sound)
 
         # Keep Awake Toggle Button
-        self.btn_keep_awake = QPushButton("☕ Awake: ON", self)
+        self.btn_keep_awake = QPushButton("Keep Awake: ON", self)
         self.btn_keep_awake.setObjectName("KeepAwakeBtn")
         self.btn_keep_awake.setCheckable(True)
         self.btn_keep_awake.setChecked(True)
@@ -124,23 +123,15 @@ class StatusWidget(QWidget):
         self.btn_keep_awake.toggled.connect(self._on_keep_awake_toggled)
         layout.addWidget(self.btn_keep_awake)
 
-        # Emergency Kill Switch Button
-        self.btn_emergency_kill = QPushButton("🛑 Reset", self)
-        self.btn_emergency_kill.setObjectName("EmergencyKillBtn")
-        self.btn_emergency_kill.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_emergency_kill.setToolTip("Immediately restores device physical GPS and closes tunnels")
-        self.btn_emergency_kill.clicked.connect(self.sig_emergency_kill_clicked.emit)
-        layout.addWidget(self.btn_emergency_kill)
-
         self.set_status("NO_DEVICE")
 
     def _on_sound_toggled(self, checked: bool):
         set_sound_enabled(checked)
-        self.btn_sound.setText("🔊 Sound" if checked else "🔇 Muted")
+        self.btn_sound.setText("Sound: ON" if checked else "Sound: OFF")
         self.sig_sound_toggled.emit(checked)
 
     def _on_keep_awake_toggled(self, checked: bool):
-        self.btn_keep_awake.setText("☕ Awake: ON" if checked else "☕ Awake: OFF")
+        self.btn_keep_awake.setText("Keep Awake: ON" if checked else "Keep Awake: OFF")
         self.sig_keep_awake_toggled.emit(checked)
 
     def set_status(self, status_key: str, custom_text: Optional[str] = None):
@@ -211,7 +202,7 @@ class StatusWidget(QWidget):
             self.combo_devices.setEnabled(True)
 
             primary = devices[0]
-            batt_str = f"🔋 {primary['battery_level']}%" if primary.get("battery_level") is not None else ""
+            batt_str = f"Battery: {primary['battery_level']}%" if primary.get("battery_level") is not None else ""
             conn_str = primary.get("connection_type", "USB")
             info_parts = [p for p in [batt_str, conn_str] if p]
             self.device_info_label.setText(" • ".join(info_parts))
@@ -237,7 +228,7 @@ class StatusWidget(QWidget):
     def _on_device_combo_changed(self, index: int):
         data = self.combo_devices.itemData(index)
         if data and isinstance(data, dict):
-            batt_str = f"🔋 {data['battery_level']}%" if data.get("battery_level") is not None else ""
+            batt_str = f"Battery: {data['battery_level']}%" if data.get("battery_level") is not None else ""
             conn_str = data.get("connection_type", "USB")
             info_parts = [p for p in [batt_str, conn_str] if p]
             self.device_info_label.setText(" • ".join(info_parts))

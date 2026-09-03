@@ -150,21 +150,21 @@ class RouteWidget(QWidget):
         dir_layout.setContentsMargins(12, 12, 12, 12)
         dir_layout.setSpacing(10)
 
-        # Left Icon Column: ○  ⋮  📍
+        # Left Icon Column: ○  ⋮  ●
         icon_col = QVBoxLayout()
         icon_col.setContentsMargins(0, 0, 0, 0)
         icon_col.setSpacing(2)
         icon_col.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         lbl_origin_dot = QLabel("○", self)
-        lbl_origin_dot.setStyleSheet("color: #94a3b8; font-size: 16px; font-weight: bold; background: transparent; border: none;")
+        lbl_origin_dot.setStyleSheet("color: #94a3b8; font-size: 15px; font-weight: bold; background: transparent; border: none;")
         icon_col.addWidget(lbl_origin_dot, 0, Qt.AlignmentFlag.AlignCenter)
 
         lbl_dots = QLabel("⋮", self)
         lbl_dots.setStyleSheet("color: #64748b; font-size: 14px; font-weight: bold; background: transparent; border: none;")
         icon_col.addWidget(lbl_dots, 0, Qt.AlignmentFlag.AlignCenter)
 
-        lbl_dest_pin = QLabel("📍", self)
+        lbl_dest_pin = QLabel("●", self)
         lbl_dest_pin.setStyleSheet("color: #ef4444; font-size: 15px; background: transparent; border: none;")
         icon_col.addWidget(lbl_dest_pin, 0, Qt.AlignmentFlag.AlignCenter)
 
@@ -173,7 +173,7 @@ class RouteWidget(QWidget):
         # Middle Inputs Column: Start (Your location) & Destination
         inputs_col = QVBoxLayout()
         inputs_col.setContentsMargins(0, 0, 0, 0)
-        inputs_col.setSpacing(8)
+        inputs_col.setSpacing(6)
 
         self.start_search_input = QLineEdit("Your location", self)
         self.start_search_input.setStyleSheet("""
@@ -210,6 +210,14 @@ class RouteWidget(QWidget):
         self.dest_search_input.returnPressed.connect(self._do_dest_search)
         inputs_col.addWidget(self.dest_search_input)
 
+        # Suggestions dropdown placed directly below the destination input
+        self.dest_suggestions_list = QListWidget(self)
+        self.dest_suggestions_list.setObjectName("AddressSuggestionsList")
+        self.dest_suggestions_list.setMaximumHeight(130)
+        self.dest_suggestions_list.setVisible(False)
+        self.dest_suggestions_list.itemClicked.connect(self._on_dest_suggestion_clicked)
+        inputs_col.addWidget(self.dest_suggestions_list)
+
         dir_layout.addLayout(inputs_col, 1)
 
         # Right Swap Column: Centered Reverse Button ⇅
@@ -241,7 +249,7 @@ class RouteWidget(QWidget):
         dc_layout.addWidget(dir_frame)
 
         # Add destination clickable button row (+ Add destination)
-        self.btn_add_dest = QPushButton("⊕  Add destination", self)
+        self.btn_add_dest = QPushButton("+ Add destination", self)
         self.btn_add_dest.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_add_dest.setStyleSheet("""
             QPushButton {
@@ -259,20 +267,6 @@ class RouteWidget(QWidget):
         """)
         self.btn_add_dest.clicked.connect(lambda: self.dest_search_input.setFocus())
         dc_layout.addWidget(self.btn_add_dest)
-
-        # Destination suggestions dropdown
-        self.dest_suggestions_list = QListWidget(self)
-        self.dest_suggestions_list.setObjectName("AddressSuggestionsList")
-        self.dest_suggestions_list.setMaximumHeight(130)
-        self.dest_suggestions_list.setVisible(False)
-        self.dest_suggestions_list.itemClicked.connect(self._on_dest_suggestion_clicked)
-        dc_layout.addWidget(self.dest_suggestions_list)
-
-        # Confirmed destination feedback
-        self.lbl_dest_confirmed = QLabel("", self)
-        self.lbl_dest_confirmed.setStyleSheet("color: #38bdf8; font-size: 11px; font-weight: 500;")
-        self.lbl_dest_confirmed.setVisible(False)
-        dc_layout.addWidget(self.lbl_dest_confirmed)
 
         # Hidden Spinboxes (preserves full simulator API compatibility)
         self.coord_container = QWidget(self)
@@ -436,7 +430,7 @@ class RouteWidget(QWidget):
             return
 
         for item in results:
-            list_item = QListWidgetItem(f"📍 {item['name']}")
+            list_item = QListWidgetItem(item["name"])
             list_item.setToolTip(item["full_name"])
             list_item.setData(Qt.ItemDataRole.UserRole, item)
             self.dest_suggestions_list.addItem(list_item)
@@ -463,9 +457,6 @@ class RouteWidget(QWidget):
         self.dest_lat.blockSignals(False)
         self.dest_lon.blockSignals(False)
 
-        self.lbl_dest_confirmed.setText(f"Confirmed on map: {data['name']}")
-        self.lbl_dest_confirmed.setVisible(True)
-
         self.sig_destination_changed.emit(lat, lon)
 
     def _on_dest_coords_spin_changed(self):
@@ -489,8 +480,6 @@ class RouteWidget(QWidget):
 
         display_name = name or f"{lat:.4f}, {lon:.4f}"
         self.dest_search_input.setText(display_name)
-        self.lbl_dest_confirmed.setText(f"Confirmed on map: {display_name}")
-        self.lbl_dest_confirmed.setVisible(True)
 
         self.gpx_filepath = None
         self.lbl_gpx_name.setVisible(False)
@@ -549,8 +538,6 @@ class RouteWidget(QWidget):
         self.dest_lat.blockSignals(False)
         self.dest_lon.blockSignals(False)
 
-        self.lbl_dest_confirmed.setText(f"Route reversed: heading to ({s_lat:.4f}, {s_lon:.4f})")
-        self.lbl_dest_confirmed.setVisible(True)
         self.sig_destination_changed.emit(s_lat, s_lon)
 
     def _on_export_gpx_clicked(self):
@@ -569,9 +556,6 @@ class RouteWidget(QWidget):
                 success = export_gpx(pts, filepath)
                 if success:
                     play_system_sound("Pop")
-                    filename = filepath.split("/")[-1]
-                    self.lbl_dest_confirmed.setText(f"✓ Route exported to {filename}")
-                    self.lbl_dest_confirmed.setVisible(True)
 
     def _on_play_clicked(self):
         speed = self.speed_spin.value()
@@ -580,7 +564,7 @@ class RouteWidget(QWidget):
 
         if self.is_paused:
             self.is_paused = False
-            self.btn_pause.setText("⏸ Pause")
+            self.btn_pause.setText("Pause")
             self.sig_resume_route.emit()
             return
 
