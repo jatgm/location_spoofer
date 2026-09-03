@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Location Spoofer Map</title>
+  
+  <!-- Local Leaflet CSS -->
+  <link rel="stylesheet" href="leaflet.css" />
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      background: #12141a;
+      color: #f1f3f7;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+      background: #12141a;
+    }
+
+    /* Floating Search Bar */
+    .search-container {
+      position: absolute;
+      top: 14px;
+      left: 60px;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      background: rgba(24, 27, 36, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 4px 8px;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+      width: 290px;
+      transition: all 0.2s ease;
+    }
+
+    .search-container:focus-within {
+      border-color: #0a84ff;
+      box-shadow: 0 4px 20px rgba(10, 132, 255, 0.25);
+    }
+
+    .search-icon {
+      width: 16px;
+      height: 16px;
+      fill: #8e95a5;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+
+    .search-input {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #fff;
+      font-size: 13px;
+      width: 100%;
+    }
+
+    .search-input::placeholder {
+      color: #6c7385;
+    }
+
+    .search-spinner {
+      display: none;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-top-color: #0a84ff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Floating Coordinate Pill */
+    .coord-badge {
+      position: absolute;
+      bottom: 20px;
+      left: 14px;
+      z-index: 1000;
+      background: rgba(20, 23, 31, 0.88);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #9aa1b2;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+      letter-spacing: 0.2px;
+    }
+
+    .coord-badge span.val {
+      color: #38bdf8;
+      font-family: "SF Mono", Menlo, Monaco, monospace;
+      font-weight: 600;
+    }
+
+    /* Custom Pulse Pin */
+    .pulse-marker-icon {
+      position: relative;
+    }
+
+    .pin-pulse {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(10, 132, 255, 0.35);
+      position: absolute;
+      top: -16px;
+      left: -16px;
+      animation: pulsate 2s infinite ease-out;
+    }
+
+    .pin-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #0a84ff;
+      border: 2.5px solid #ffffff;
+      position: absolute;
+      top: -7px;
+      left: -7px;
+      box-shadow: 0 0 10px rgba(10, 132, 255, 0.8);
+    }
+
+    @keyframes pulsate {
+      0% {
+        transform: scale(0.6);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(2.4);
+        opacity: 0;
+      }
+    }
+
+    /* Leaflet Controls Styling */
+    .leaflet-bar {
+      border: 1px solid rgba(255, 255, 255, 0.12) !important;
+      border-radius: 8px !important;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+    }
+
+    .leaflet-bar a {
+      background: rgba(24, 27, 36, 0.9) !important;
+      color: #e1e4ed !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+      backdrop-filter: blur(8px);
+    }
+
+    .leaflet-bar a:hover {
+      background: #232836 !important;
+      color: #0a84ff !important;
+    }
+
+    .leaflet-container {
+      background: #11141c !important;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Floating Search -->
+  <div class="search-container">
+    <svg class="search-icon" viewBox="0 0 24 24">
+      <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+    </svg>
+    <input type="text" id="searchInput" class="search-input" placeholder="Search city, address or landmark..." />
+    <div id="searchSpinner" class="search-spinner"></div>
+  </div>
+
+  <!-- Coordinates display -->
+  <div class="coord-badge" id="coordBadge">
+    <div>LAT: <span class="val" id="latVal">37.334900</span></div>
+    <div>LON: <span class="val" id="lonVal">-122.009020</span></div>
+  </div>
+
+  <!-- Map Container -->
+  <div id="map"></div>
+
+  <!-- Local Leaflet JS -->
+  <script src="leaflet.js"></script>
+  
+  <!-- Local Qt WebChannel Script -->
+  <script src="qwebchannel.js"></script>
+
+  <script>
+    // Initial Coordinates: Apple Park, Cupertino
+    var currentLat = 37.334900;
+    var currentLon = -122.009020;
+    var pyBridge = null;
+
+    // Initialize Map with dark tiles
+    var map = L.map('map', {
+      zoomControl: true,
+      attributionControl: false
+    }).setView([currentLat, currentLon], 14);
+
+    // Standard OpenStreetMap Tile Layer (Free, reliable, no API key or watermark)
+    var tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19
+    }).addTo(map);
+
+    // Custom glowing pulse marker
+    var pulseIcon = L.divIcon({
+      className: 'pulse-marker-icon',
+      html: '<div class="pin-pulse"></div><div class="pin-dot"></div>',
+      iconSize: [0, 0]
+    });
+
+    var marker = L.marker([currentLat, currentLon], {
+      icon: pulseIcon,
+      draggable: true
+    }).addTo(map);
+
+    // Marker drag event
+    marker.on('dragend', function(e) {
+      var pos = marker.getLatLng();
+      updateLocation(pos.lat, pos.lng, false);
+    });
+
+    // Map click event
+    map.on('click', function(e) {
+      updateLocation(e.latlng.lat, e.latlng.lng, false);
+    });
+
+    function updateLocation(lat, lon, panToMap) {
+      currentLat = parseFloat(lat.toFixed(6));
+      currentLon = parseFloat(lon.toFixed(6));
+
+      marker.setLatLng([currentLat, currentLon]);
+      if (panToMap) {
+        map.panTo([currentLat, currentLon]);
+      }
+
+      // Update badge
+      document.getElementById('latVal').textContent = currentLat.toFixed(6);
+      document.getElementById('lonVal').textContent = currentLon.toFixed(6);
+
+      // Notify Python Bridge if ready
+      if (window.pyBridge && typeof window.pyBridge.onMapClicked === 'function') {
+        window.pyBridge.onMapClicked(currentLat, currentLon);
+      }
+    }
+
+    // Callable from Python: Set marker position
+    window.setMarkerLocation = function(lat, lon, panTo) {
+      lat = parseFloat(lat);
+      lon = parseFloat(lon);
+      if (isNaN(lat) || isNaN(lon)) return;
+      currentLat = parseFloat(lat.toFixed(6));
+      currentLon = parseFloat(lon.toFixed(6));
+      marker.setLatLng([currentLat, currentLon]);
+      if (panTo !== false) {
+        map.panTo([currentLat, currentLon]);
+      }
+      document.getElementById('latVal').textContent = currentLat.toFixed(6);
+      document.getElementById('lonVal').textContent = currentLon.toFixed(6);
+    };
+
+    // Callable from Python: Fly to location
+    window.flyToLocation = function(lat, lon, zoom) {
+      lat = parseFloat(lat);
+      lon = parseFloat(lon);
+      zoom = zoom || 15;
+      currentLat = parseFloat(lat.toFixed(6));
+      currentLon = parseFloat(lon.toFixed(6));
+      marker.setLatLng([currentLat, currentLon]);
+      map.flyTo([currentLat, currentLon], zoom, { duration: 1.2 });
+      document.getElementById('latVal').textContent = currentLat.toFixed(6);
+      document.getElementById('lonVal').textContent = currentLon.toFixed(6);
+    };
+
+    // Initialize QWebChannel bridge
+    function initWebChannel() {
+      if (typeof QWebChannel !== "undefined" && typeof qt !== "undefined" && qt.webChannelTransport) {
+        new QWebChannel(qt.webChannelTransport, function(channel) {
+          window.pyBridge = channel.objects.pyBridge;
+          console.log("QWebChannel connected to pyBridge");
+        });
+      } else {
+        setTimeout(initWebChannel, 200);
+      }
+    }
+    initWebChannel();
+
+    // Route Polyline Layer
+    var routePolyline = null;
+    var destMarker = null;
+
+    window.drawRoute = function(coords) {
+      if (typeof coords === 'string') {
+        try { coords = JSON.parse(coords); } catch(e) {}
+      }
+      if (routePolyline) {
+        map.removeLayer(routePolyline);
+      }
+      if (destMarker) {
+        map.removeLayer(destMarker);
+      }
+
+      if (!coords || coords.length === 0) return;
+
+      routePolyline = L.polyline(coords, {
+        color: '#38bdf8',
+        weight: 5,
+        opacity: 0.9,
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(map);
+
+      // Add a finish destination icon at the final point
+      var lastPt = coords[coords.length - 1];
+      var destIcon = L.divIcon({
+        className: 'dest-marker-icon',
+        html: '<div style="background:#f43f5e; border-radius:50%; width:14px; height:14px; box-shadow:0 0 10px rgba(244,63,94,0.8); border:2.5px solid #ffffff;"></div>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
+      destMarker = L.marker(lastPt, { icon: destIcon }).addTo(map);
+
+      map.fitBounds(routePolyline.getBounds(), { padding: [50, 50] });
+    };
+
+    window.clearRoute = function() {
+      if (routePolyline) {
+        map.removeLayer(routePolyline);
+        routePolyline = null;
+      }
+      if (destMarker) {
+        map.removeLayer(destMarker);
+        destMarker = null;
+      }
+    };
+
+    // Geocoding Search via OpenStreetMap Nominatim
+    var searchInput = document.getElementById('searchInput');
+    var searchSpinner = document.getElementById('searchSpinner');
+
+    searchInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        var query = searchInput.value.trim();
+        if (!query) return;
+
+        searchSpinner.style.display = 'block';
+        var url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query);
+
+        fetch(url, { headers: { 'Accept': 'application/json' } })
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
+            searchSpinner.style.display = 'none';
+            if (data && data.length > 0) {
+              var item = data[0];
+              var lat = parseFloat(item.lat);
+              var lon = parseFloat(item.lon);
+              updateLocation(lat, lon, true);
+              map.flyTo([lat, lon], 15, { duration: 1.2 });
+            }
+          })
+          .catch(function(err) {
+            searchSpinner.style.display = 'none';
+            console.error("Geocoding failed:", err);
+          });
+      }
+    });
+  </script>
+</body>
+</html>
