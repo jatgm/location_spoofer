@@ -9,9 +9,12 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QDoubleSpinBox, QPushButton, QSlider, QProgressBar,
     QFileDialog, QFrame, QGridLayout, QLineEdit,
-    QListWidget, QListWidgetItem, QAbstractSpinBox
+    QListWidget, QListWidgetItem, QAbstractSpinBox,
+    QCheckBox
 )
 from app.core.geolocation import search_addresses
+from app.core.route_simulator import export_gpx, fetch_osrm_route
+from app.core.notifications import play_system_sound
 
 
 class GeocodeSearchThread(QThread):
@@ -29,7 +32,7 @@ class GeocodeSearchThread(QThread):
 class RouteWidget(QWidget):
     """Control panel for turn-by-turn road and GPX route simulation."""
 
-    sig_start_route = pyqtSignal(float, float, float, float, float)  # start_lat, start_lon, dest_lat, dest_lon, speed
+    sig_start_route = pyqtSignal(float, float, float, float, float, bool, bool)  # s_lat, s_lon, d_lat, d_lon, speed, traffic, loop
     sig_start_gpx = pyqtSignal(str, float)                          # filepath, speed
     sig_pause_route = pyqtSignal()
     sig_resume_route = pyqtSignal()
@@ -196,24 +199,62 @@ class RouteWidget(QWidget):
 
         dc_layout.addLayout(coord_grid)
 
-        # Set from Map button
-        self.btn_set_dest_from_map = QPushButton("Use Selected Pin as Destination", self)
+        # Row: Reverse Route & Use Selected Pin
+        dest_action_row = QHBoxLayout()
+        dest_action_row.setSpacing(8)
+
+        self.btn_reverse_route = QPushButton("⇄ Reverse Route", self)
+        self.btn_reverse_route.setProperty("class", "SecondaryBtn")
+        self.btn_reverse_route.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_reverse_route.setFixedHeight(32)
+        self.btn_reverse_route.setToolTip("Swaps Start and Destination to travel back along the same path")
+        self.btn_reverse_route.clicked.connect(self._on_reverse_route_clicked)
+        dest_action_row.addWidget(self.btn_reverse_route, 1)
+
+        self.btn_set_dest_from_map = QPushButton("Use Selected Pin", self)
         self.btn_set_dest_from_map.setProperty("class", "SecondaryBtn")
         self.btn_set_dest_from_map.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_set_dest_from_map.setFixedHeight(32)
-        dc_layout.addWidget(self.btn_set_dest_from_map)
+        dest_action_row.addWidget(self.btn_set_dest_from_map, 1)
 
-        # GPX Option
-        self.btn_load_gpx = QPushButton("Load GPX File...", self)
+        dc_layout.addLayout(dest_action_row)
+
+        # Row: Load GPX & Export Route as GPX
+        gpx_row = QHBoxLayout()
+        gpx_row.setSpacing(8)
+
+        self.btn_load_gpx = QPushButton("Load GPX...", self)
         self.btn_load_gpx.setProperty("class", "SecondaryBtn")
         self.btn_load_gpx.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_load_gpx.setFixedHeight(32)
         self.btn_load_gpx.clicked.connect(self._on_load_gpx_clicked)
-        dc_layout.addWidget(self.btn_load_gpx)
+        gpx_row.addWidget(self.btn_load_gpx, 1)
+
+        self.btn_export_gpx = QPushButton("Export GPX...", self)
+        self.btn_export_gpx.setProperty("class", "SecondaryBtn")
+        self.btn_export_gpx.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_export_gpx.setFixedHeight(32)
+        self.btn_export_gpx.setToolTip("Export current calculated road route into a .gpx track file")
+        self.btn_export_gpx.clicked.connect(self._on_export_gpx_clicked)
+        gpx_row.addWidget(self.btn_export_gpx, 1)
+
+        dc_layout.addLayout(gpx_row)
 
         self.lbl_gpx_name = QLabel("", self)
         self.lbl_gpx_name.setStyleSheet("color: #38bdf8; font-size: 11px;")
         self.lbl_gpx_name.setVisible(False)
         dc_layout.addWidget(self.lbl_gpx_name)
+
+        # Realistic Movement Checkboxes
+        self.chk_realistic_traffic = QCheckBox("Realistic Traffic & Corner Deceleration", self)
+        self.chk_realistic_traffic.setStyleSheet("color: #cbd5e1; font-size: 12px; font-weight: 500;")
+        self.chk_realistic_traffic.setToolTip("Applies natural speed fluctuations (±5%) and slows down along sharp turns")
+        dc_layout.addWidget(self.chk_realistic_traffic)
+
+        self.chk_loop_route = QCheckBox("Loop Route Continually", self)
+        self.chk_loop_route.setStyleSheet("color: #cbd5e1; font-size: 12px; font-weight: 500;")
+        self.chk_loop_route.setToolTip("Repeats the route automatically upon arriving at the destination")
+        dc_layout.addWidget(self.chk_loop_route)
 
         layout.addWidget(dest_card)
 
@@ -397,14 +438,65 @@ class RouteWidget(QWidget):
             self.lbl_gpx_name.setText(f"Loaded: {filename}")
             self.lbl_gpx_name.setVisible(True)
 
+    def _on_reverse_route_clicked(self):
+        """Swaps start coordinates and destination coordinates."""
+        play_system_sound("Tink")
+        s_lat = self.start_lat.value()
+        s_lon = self.start_lon.value()
+        d_lat = self.dest_lat.value()
+        d_lon = self.dest_lon.value()
+
+        self.start_lat.blockSignals(True)
+        self.start_lon.blockSignals(True)
+        self.dest_lat.blockSignals(True)
+        self.dest_lon.blockSignals(True)
+
+        self.start_lat.setValue(d_lat)
+        self.start_lon.setValue(d_lon)
+        self.dest_lat.setValue(s_lat)
+        self.dest_lon.setValue(s_lon)
+
+        self.start_lat.blockSignals(False)
+        self.start_lon.blockSignals(False)
+        self.dest_lat.blockSignals(False)
+        self.dest_lon.blockSignals(False)
+
+        self.lbl_dest_confirmed.setText(f"Route reversed: heading to ({s_lat:.4f}, {s_lon:.4f})")
+        self.lbl_dest_confirmed.setVisible(True)
+        self.sig_destination_changed.emit(s_lat, s_lon)
+
+    def _on_export_gpx_clicked(self):
+        """Calculates and exports the current road route into a .gpx track file."""
+        s_lat = self.start_lat.value()
+        s_lon = self.start_lon.value()
+        d_lat = self.dest_lat.value()
+        d_lon = self.dest_lon.value()
+
+        filepath, _ = QFileDialog.getSaveFileName(
+            self, "Save Route as GPX", "simulated_route.gpx", "GPX Files (*.gpx)"
+        )
+        if filepath:
+            pts = fetch_osrm_route(s_lat, s_lon, d_lat, d_lon)
+            if pts:
+                success = export_gpx(pts, filepath)
+                if success:
+                    play_system_sound("Pop")
+                    filename = filepath.split("/")[-1]
+                    self.lbl_dest_confirmed.setText(f"✓ Route exported to {filename}")
+                    self.lbl_dest_confirmed.setVisible(True)
+
     def _on_play_clicked(self):
         speed = self.speed_spin.value()
+        traffic = self.chk_realistic_traffic.isChecked()
+        loop = self.chk_loop_route.isChecked()
+
         if self.is_paused:
             self.is_paused = False
             self.btn_pause.setText("⏸ Pause")
             self.sig_resume_route.emit()
             return
 
+        play_system_sound("Purr")
         self.is_running = True
         self.is_paused = False
         self.btn_play.setEnabled(False)
@@ -418,7 +510,7 @@ class RouteWidget(QWidget):
             s_lon = self.start_lon.value()
             d_lat = self.dest_lat.value()
             d_lon = self.dest_lon.value()
-            self.sig_start_route.emit(s_lat, s_lon, d_lat, d_lon, speed)
+            self.sig_start_route.emit(s_lat, s_lon, d_lat, d_lon, speed, traffic, loop)
 
     def _on_pause_clicked(self):
         if not self.is_paused:

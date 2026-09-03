@@ -17,6 +17,8 @@ from app.ui.log_widget import LogWidget
 from app.ui.styles import DARK_STYLESHEET
 from app.core.worker_thread import DeviceWorker
 from app.core.power_manager import SleepPreventionManager
+from app.core.notifications import send_macos_notification, play_system_sound
+from app.version import get_version_string
 
 
 class MainWindow(QMainWindow):
@@ -24,7 +26,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("iOS Location Spoofer (iOS 17+ / CoreDevice)")
+        self.setWindowTitle(f"iOS Location Spoofer {get_version_string()} (iOS 17+ / CoreDevice)")
         self.resize(1200, 840)
         self.setMinimumSize(960, 680)
 
@@ -116,9 +118,11 @@ class MainWindow(QMainWindow):
         self.controls_widget.sig_spoof_requested.connect(self.worker.spoof_location)
         self.controls_widget.sig_reset_requested.connect(self.worker.reset_location)
         self.controls_widget.sig_actual_location_requested.connect(self._jump_to_real_location)
+        self.controls_widget.sig_drift_toggled.connect(self.worker.set_natural_drift)
         self.status_widget.sig_refresh_clicked.connect(self.worker.refresh_devices_now)
         self.status_widget.sig_device_selected.connect(self.worker.set_target_device)
         self.status_widget.sig_keep_awake_toggled.connect(self._on_keep_awake_toggled)
+        self.status_widget.sig_emergency_kill_clicked.connect(self.worker.emergency_kill_now)
 
         # Tab switching
         self.tabs.currentChanged.connect(self._on_tab_changed)
@@ -246,6 +250,12 @@ class MainWindow(QMainWindow):
     def _on_device_disconnected(self):
         self.controls_widget.set_spoofing_state(False)
         self.status_widget.set_status("NO_DEVICE", "iOS Device Disconnected")
+        self.log_widget.append_log("WARN", "USB connection dropped! Physical GPS restored.")
+        send_macos_notification(
+            "iPhone Disconnected",
+            "USB connection dropped! Physical GPS restored.",
+            sound_name="Sosumi"
+        )
 
     def _on_device_error(self, title: str, message: str, advice: str):
         """Displays a structured troubleshooting dialog."""

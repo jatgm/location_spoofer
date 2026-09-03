@@ -252,6 +252,50 @@ QPushButton#ResetButton:disabled {
     color: #555e70;
 }
 
+/* Emergency Kill Switch Button */
+QPushButton#EmergencyKillBtn {
+    background-color: rgba(255, 69, 58, 0.14);
+    border: 1px solid rgba(255, 69, 58, 0.38);
+    border-radius: 7px;
+    color: #ff453a;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 12px;
+}
+
+QPushButton#EmergencyKillBtn:hover {
+    background-color: #ff453a;
+    color: #ffffff;
+    border-color: #ff6961;
+}
+
+QPushButton#EmergencyKillBtn:pressed {
+    background-color: #d70015;
+}
+
+/* Sound Toggle Button */
+QPushButton#SoundToggleBtn {
+    background-color: #1a1e28;
+    border: 1px solid #282f3f;
+    border-radius: 7px;
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 10px;
+}
+
+QPushButton#SoundToggleBtn:hover {
+    background-color: #242b3b;
+    border-color: #3b465e;
+    color: #ffffff;
+}
+
+QPushButton#SoundToggleBtn:checked {
+    background-color: rgba(14, 165, 233, 0.15);
+    border: 1px solid rgba(14, 165, 233, 0.45);
+    color: #38bdf8;
+}
+
 /* Preset Landmark Buttons */
 QPushButton.PresetBtn {
     background-color: #191c26;

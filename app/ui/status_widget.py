@@ -4,11 +4,12 @@ and device selection controls.
 """
 
 from typing import Dict, List, Any, Optional
-from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtCore import pyqtSignal, Qt, QPropertyAnimation, QEasingCurve, QRect
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel,
     QComboBox, QPushButton, QFrame, QCheckBox
 )
+from app.core.notifications import play_system_sound, is_sound_enabled, set_sound_enabled
 
 
 class StatusWidget(QWidget):
@@ -17,6 +18,8 @@ class StatusWidget(QWidget):
     sig_device_selected = pyqtSignal(str, bool)  # (udid, is_ios17)
     sig_refresh_clicked = pyqtSignal()
     sig_keep_awake_toggled = pyqtSignal(bool)
+    sig_sound_toggled = pyqtSignal(bool)
+    sig_emergency_kill_clicked = pyqtSignal()
 
     STATUS_STYLES = {
         "NO_DEVICE": {
@@ -100,7 +103,17 @@ class StatusWidget(QWidget):
         self.btn_refresh.clicked.connect(self.sig_refresh_clicked.emit)
         layout.addWidget(self.btn_refresh)
 
-        # Keep Awake Toggle Button (Top Right)
+        # Sound Toggle Button
+        self.btn_sound = QPushButton("Sound: ON", self)
+        self.btn_sound.setObjectName("SoundToggleBtn")
+        self.btn_sound.setCheckable(True)
+        self.btn_sound.setChecked(True)
+        self.btn_sound.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_sound.setToolTip("Toggle macOS system sound effects")
+        self.btn_sound.toggled.connect(self._on_sound_toggled)
+        layout.addWidget(self.btn_sound)
+
+        # Keep Awake Toggle Button
         self.btn_keep_awake = QPushButton("Keep Awake: ON", self)
         self.btn_keep_awake.setObjectName("KeepAwakeBtn")
         self.btn_keep_awake.setCheckable(True)
@@ -110,7 +123,20 @@ class StatusWidget(QWidget):
         self.btn_keep_awake.toggled.connect(self._on_keep_awake_toggled)
         layout.addWidget(self.btn_keep_awake)
 
+        # Emergency Kill Switch Button
+        self.btn_emergency_kill = QPushButton("Emergency Reset", self)
+        self.btn_emergency_kill.setObjectName("EmergencyKillBtn")
+        self.btn_emergency_kill.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_emergency_kill.setToolTip("Immediately restores device physical GPS and closes tunnels")
+        self.btn_emergency_kill.clicked.connect(self.sig_emergency_kill_clicked.emit)
+        layout.addWidget(self.btn_emergency_kill)
+
         self.set_status("NO_DEVICE")
+
+    def _on_sound_toggled(self, checked: bool):
+        set_sound_enabled(checked)
+        self.btn_sound.setText("Sound: ON" if checked else "Sound: OFF")
+        self.sig_sound_toggled.emit(checked)
 
     def _on_keep_awake_toggled(self, checked: bool):
         if checked:
@@ -167,6 +193,7 @@ class StatusWidget(QWidget):
     }
 
     def update_devices(self, devices: List[Dict[str, Any]]):
+        was_empty = len(self._devices) == 0 and len(devices) > 0
         self._devices = devices
         self.combo_devices.blockSignals(True)
         self.combo_devices.clear()
@@ -190,17 +217,34 @@ class StatusWidget(QWidget):
             self.combo_devices.setEnabled(True)
 
             primary = devices[0]
+            batt_str = f"🔋 {primary['battery_level']}% • " if primary.get("battery_level") is not None else ""
             self.device_info_label.setText(
-                f"UDID: {primary['udid'][:12]}... • {primary['connection_type']} • iOS {primary['version']}"
+                f"{batt_str}UDID: {primary['udid'][:12]}... • {primary['connection_type']} • iOS {primary['version']}"
             )
             self.set_status("CONNECTED")
 
+            if was_empty:
+                self._animate_connect()
+                play_system_sound("Pop")
+
         self.combo_devices.blockSignals(False)
+
+    def _animate_connect(self):
+        """Dynamic Island style expanding spring animation on USB connect."""
+        anim = QPropertyAnimation(self.status_frame, b"geometry", self)
+        anim.setDuration(450)
+        anim.setEasingCurve(QEasingCurve.Type.OutBack)
+        orig_geo = self.status_frame.geometry()
+        start_geo = QRect(orig_geo.x(), orig_geo.y(), max(20, orig_geo.width() - 35), orig_geo.height())
+        anim.setStartValue(start_geo)
+        anim.setEndValue(orig_geo)
+        anim.start()
 
     def _on_device_combo_changed(self, index: int):
         data = self.combo_devices.itemData(index)
         if data and isinstance(data, dict):
+            batt_str = f"🔋 {data['battery_level']}% • " if data.get("battery_level") is not None else ""
             self.device_info_label.setText(
-                f"UDID: {data['udid'][:12]}... • {data['connection_type']} • iOS {data['version']}"
+                f"{batt_str}UDID: {data['udid'][:12]}... • {data['connection_type']} • iOS {data['version']}"
             )
             self.sig_device_selected.emit(data["udid"], data.get("is_ios17_plus", True))

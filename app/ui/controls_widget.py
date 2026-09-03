@@ -8,9 +8,11 @@ from PyQt6.QtCore import pyqtSignal, Qt, QTimer, QThread
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QDoubleSpinBox, QPushButton, QGridLayout, QFrame,
-    QLineEdit, QListWidget, QListWidgetItem, QAbstractSpinBox
+    QLineEdit, QListWidget, QListWidgetItem, QAbstractSpinBox,
+    QCheckBox
 )
 from app.core.geolocation import search_addresses
+from app.core.notifications import play_system_sound
 
 
 class GeocodeSearchThread(QThread):
@@ -32,6 +34,7 @@ class ControlsWidget(QWidget):
     sig_reset_requested = pyqtSignal()
     sig_coords_changed = pyqtSignal(float, float)
     sig_actual_location_requested = pyqtSignal()
+    sig_drift_toggled = pyqtSignal(bool)
 
     PRESETS = [
         ("Apple Park", 37.334900, -122.009020),
@@ -176,6 +179,13 @@ class ControlsWidget(QWidget):
         self.btn_reset.clicked.connect(self.sig_reset_requested.emit)
         action_layout.addWidget(self.btn_reset)
 
+        # Natural GPS Drift Checkbox
+        self.chk_natural_drift = QCheckBox("Natural GPS Drift (~0.8m micro-jitter)", self)
+        self.chk_natural_drift.setStyleSheet("color: #cbd5e1; font-size: 12px; font-weight: 500;")
+        self.chk_natural_drift.setToolTip("Subtly varies stationary GPS position by ~0.8m so location doesn't appear frozen")
+        self.chk_natural_drift.toggled.connect(self.sig_drift_toggled.emit)
+        action_layout.addWidget(self.chk_natural_drift)
+
         layout.addWidget(action_card)
 
         # 3. Quick Landmark Presets Card
@@ -271,11 +281,13 @@ class ControlsWidget(QWidget):
             self.sig_coords_changed.emit(lat, lon)
 
     def _on_spoof_clicked(self):
+        play_system_sound("Pop")
         lat = self.spin_lat.value()
         lon = self.spin_lon.value()
         self.sig_spoof_requested.emit(lat, lon)
 
     def _apply_preset(self, lat: float, lon: float):
+        play_system_sound("Tink")
         self.set_coordinates(lat, lon)
         self.sig_coords_changed.emit(lat, lon)
 

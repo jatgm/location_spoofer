@@ -228,15 +228,40 @@ class DeviceWorker(QThread):
             self.sig_log.emit("ERROR", f"Failed to reset location: {msg}")
             self.sig_error.emit(title, msg, advice)
 
+    def set_natural_drift(self, enabled: bool):
+        """Toggles realistic GPS micro-drift."""
+        self.service.set_natural_drift(enabled)
+
+    def emergency_kill_now(self):
+        """Immediately aborts all simulations, tunnels, and restores device physical GPS."""
+        self.stop_route_simulation()
+        if self.loop and self.loop.is_running():
+            asyncio.run_coroutine_threadsafe(
+                self.service.emergency_kill(),
+                self.loop
+            )
+        self.sig_clear_success.emit()
+        self.sig_status_changed.emit("CONNECTED", "Emergency Reset Triggered")
+        self.sig_log.emit("WARN", "Emergency Kill Switch Activated. Physical GPS Restored.")
+
     # ================= Route Simulation API =================
 
-    def start_route_simulation(self, start_lat: float, start_lon: float, dest_lat: float, dest_lon: float, speed_kmh: float):
-        """Starts turn-by-turn road route simulation between two points."""
+    def start_route_simulation(
+        self,
+        s_lat: float,
+        s_lon: float,
+        d_lat: float,
+        d_lon: float,
+        speed_kmh: float,
+        realistic_traffic: bool = False,
+        loop_route: bool = False
+    ):
+        """Calculates road route and initiates timed waypoint playback."""
         self._route_stopped = False
         self._route_paused = False
         if self.loop and self.loop.is_running():
             asyncio.run_coroutine_threadsafe(
-                self._async_start_route(start_lat, start_lon, dest_lat, dest_lon, speed_kmh),
+                self._async_start_route(s_lat, s_lon, d_lat, d_lon, speed_kmh, realistic_traffic, loop_route),
                 self.loop
             )
 
@@ -269,14 +294,31 @@ class DeviceWorker(QThread):
         self.sig_log.emit("INFO", "Route simulation stopped.")
         self.sig_status_changed.emit("CONNECTED", "Route Stopped")
 
-    async def _async_start_route(self, s_lat: float, s_lon: float, d_lat: float, d_lon: float, speed_kmh: float):
+    async def _async_start_route(
+        self,
+        s_lat: float,
+        s_lon: float,
+        d_lat: float,
+        d_lon: float,
+        speed_kmh: float,
+        realistic_traffic: bool = False,
+        loop_route: bool = False
+    ):
         try:
-            self.sig_log.emit("INFO", f"Calculating road route to ({d_lat:.4f}, {d_lon:.4f}) at {speed_kmh} km/h...")
+            traffic_note = " (with realistic traffic & turns)" if realistic_traffic else ""
+            self.sig_log.emit("INFO", f"Calculating road route to ({d_lat:.4f}, {d_lon:.4f}) at {speed_kmh} km/h{traffic_note}...")
             raw_pts = await asyncio.to_thread(fetch_osrm_route, s_lat, s_lon, d_lat, d_lon)
             self.sig_route_started.emit(raw_pts)
 
-            timeline = build_interpolated_timeline(raw_pts, speed_kmh, tick_interval_sec=1.0)
-            self._route_task = asyncio.create_task(self._async_run_route_loop(timeline, speed_kmh))
+            timeline = build_interpolated_timeline(
+                raw_pts,
+                speed_kmh,
+                tick_interval_sec=1.0,
+                realistic_traffic=realistic_traffic
+            )
+            self._route_task = asyncio.create_task(
+                self._async_run_route_loop(timeline, speed_kmh, loop_route=loop_route)
+            )
         except Exception as e:
             self.sig_log.emit("ERROR", f"Failed to initiate route: {e}")
 
@@ -290,11 +332,16 @@ class DeviceWorker(QThread):
 
             self.sig_route_started.emit(raw_pts)
             timeline = build_interpolated_timeline(raw_pts, speed_kmh, tick_interval_sec=1.0)
-            self._route_task = asyncio.create_task(self._async_run_route_loop(timeline, speed_kmh))
+            self._route_task = asyncio.create_task(self._async_run_route_loop(timeline, speed_kmh, loop_route=False))
         except Exception as e:
             self.sig_log.emit("ERROR", f"Failed to load GPX track: {e}")
 
-    async def _async_run_route_loop(self, timeline: List[Tuple[float, float]], speed_kmh: float):
+    async def _async_run_route_loop(
+        self,
+        timeline: List[Tuple[float, float]],
+        speed_kmh: float,
+        loop_route: bool = False
+    ):
         total_steps = len(timeline)
         if total_steps == 0:
             return
@@ -302,35 +349,42 @@ class DeviceWorker(QThread):
         self.sig_log.emit("SUCCESS", f"Route simulation started ({total_steps} points, {speed_kmh} km/h)")
         self.sig_status_changed.emit("SPOOFING", f"Simulating Route ({speed_kmh} km/h)")
 
-        for idx, (lat, lon) in enumerate(timeline):
-            if self._route_stopped:
+        while not self._route_stopped:
+            for idx, (lat, lon) in enumerate(timeline):
+                if self._route_stopped:
+                    break
+
+                while self._route_paused and not self._route_stopped:
+                    await asyncio.sleep(0.5)
+
+                if self._route_stopped:
+                    break
+
+                # Send coordinate to device
+                try:
+                    await self.service.set_location(
+                        latitude=lat,
+                        longitude=lon,
+                        udid=self._active_udid,
+                        is_ios17=self._is_ios17
+                    )
+                except Exception as e:
+                    self.sig_log.emit("WARN", f"Location update warning: {e}")
+
+                # Compute ETA
+                remaining_seconds = total_steps - idx - 1
+                mins, secs = divmod(remaining_seconds, 60)
+                eta_str = f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
+                pct = ((idx + 1) / total_steps) * 100.0
+
+                self.sig_route_progress.emit(lat, lon, pct, eta_str)
+                await asyncio.sleep(1.0)
+
+            if not self._route_stopped and loop_route:
+                self.sig_log.emit("INFO", "Route loop enabled: restarting from start point...")
+                await asyncio.sleep(1.0)
+            else:
                 break
-
-            while self._route_paused and not self._route_stopped:
-                await asyncio.sleep(0.5)
-
-            if self._route_stopped:
-                break
-
-            # Send coordinate to device
-            try:
-                await self.service.set_location(
-                    latitude=lat,
-                    longitude=lon,
-                    udid=self._active_udid,
-                    is_ios17=self._is_ios17
-                )
-            except Exception as e:
-                self.sig_log.emit("WARN", f"Location update warning: {e}")
-
-            # Compute ETA
-            remaining_seconds = total_steps - idx - 1
-            mins, secs = divmod(remaining_seconds, 60)
-            eta_str = f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
-            pct = ((idx + 1) / total_steps) * 100.0
-
-            self.sig_route_progress.emit(lat, lon, pct, eta_str)
-            await asyncio.sleep(1.0)
 
         if not self._route_stopped:
             self.sig_route_finished.emit()

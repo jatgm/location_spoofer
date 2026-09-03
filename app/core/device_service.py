@@ -27,6 +27,7 @@ class DeviceInfo:
         model: str = "iPhone",
         connection_type: str = "USB",
         is_ios17_plus: bool = True,
+        battery_level: Optional[int] = None,
     ):
         self.udid = udid
         self.name = name
@@ -34,6 +35,7 @@ class DeviceInfo:
         self.model = model
         self.connection_type = connection_type
         self.is_ios17_plus = is_ios17_plus
+        self.battery_level = battery_level
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -43,6 +45,7 @@ class DeviceInfo:
             "model": self.model,
             "connection_type": self.connection_type,
             "is_ios17_plus": self.is_ios17_plus,
+            "battery_level": self.battery_level,
         }
 
 
@@ -69,6 +72,8 @@ class DeviceService:
 
         self.is_spoofing: bool = False
         self.current_coords: Optional[tuple] = None
+        self.natural_drift_enabled: bool = False
+        self._drift_task: Optional[asyncio.Task] = None
 
     async def list_devices(self) -> List[DeviceInfo]:
         """Scans usbmux for connected iOS devices and queries their metadata."""
@@ -80,11 +85,12 @@ class DeviceService:
             udid = mux_dev.serial
             conn_type = "USB" if mux_dev.is_usb else "Network"
 
-            # Attempt a quick lockdown probe to query device name & iOS version
+            # Attempt a quick lockdown probe to query device name, battery & iOS version
             name = "iOS Device"
             version_str = "17.0"
             model = "iPhone"
             is_ios17 = True
+            battery_pct = None
 
             try:
                 # autopair=True allows fetching properties if already trusted
@@ -92,6 +98,13 @@ class DeviceService:
                     name = getattr(ld, "device_name", name) or name
                     version_str = getattr(ld, "product_version", version_str) or version_str
                     model = getattr(ld, "product_type", model) or model
+                    try:
+                        batt_dict = await ld.get_value(domain="com.apple.mobile.battery")
+                        if batt_dict and "BatteryCurrentCapacity" in batt_dict:
+                            battery_pct = int(batt_dict["BatteryCurrentCapacity"])
+                    except Exception:
+                        pass
+
                     try:
                         is_ios17 = Version(version_str) >= Version("17.0")
                     except Exception:
@@ -106,6 +119,7 @@ class DeviceService:
                 model=model,
                 connection_type=conn_type,
                 is_ios17_plus=is_ios17,
+                battery_level=battery_pct,
             )
             result.append(info)
 
@@ -163,10 +177,49 @@ class DeviceService:
         self.current_coords = (latitude, longitude)
         logger.info(f"Simulated location set to: ({latitude}, {longitude})")
 
+        if self.natural_drift_enabled:
+            if self._drift_task and not self._drift_task.done():
+                self._drift_task.cancel()
+            self._drift_task = asyncio.create_task(self._drift_loop())
+
+    def set_natural_drift(self, enabled: bool):
+        """Enables or disables realistic 0.8m micro-drift when stationary."""
+        self.natural_drift_enabled = enabled
+        if not enabled and self._drift_task and not self._drift_task.done():
+            self._drift_task.cancel()
+            self._drift_task = None
+        elif enabled and self.is_spoofing and (not self._drift_task or self._drift_task.done()):
+            self._drift_task = asyncio.create_task(self._drift_loop())
+
+    async def _drift_loop(self):
+        """Periodically applies subtle satellite jitter (~0.8m) to mimic real GPS chips."""
+        import random
+        try:
+            while self.is_spoofing and self.natural_drift_enabled:
+                await asyncio.sleep(2.5)
+                if not self.is_spoofing or not self.current_coords:
+                    break
+                base_lat, base_lon = self.current_coords
+                # Micro-jitter within 0.000007 degrees (~0.78 meters)
+                drift_lat = base_lat + random.uniform(-0.000007, 0.000007)
+                drift_lon = base_lon + random.uniform(-0.000007, 0.000007)
+                if self.loc_simulation:
+                    await self.loc_simulation.set(drift_lat, drift_lon)
+                elif self.legacy_loc_sim:
+                    await self.legacy_loc_sim.set(drift_lat, drift_lon)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.debug(f"Natural drift loop error: {e}")
+
     async def clear_location(self) -> None:
         """
         Stops location simulation and restores the device's real physical GPS.
         """
+        if self._drift_task and not self._drift_task.done():
+            self._drift_task.cancel()
+            self._drift_task = None
+
         if self.loc_simulation:
             try:
                 await self.loc_simulation.clear()
@@ -182,8 +235,30 @@ class DeviceService:
         self.current_coords = None
         logger.info("Simulated location cleared. Physical GPS restored.")
 
+    async def emergency_kill(self) -> None:
+        """Immediate failsafe kill switch: clears simulation, closes tunnels, restores physical GPS."""
+        logger.warning("EMERGENCY KILL SWITCH TRIGGERED!")
+        if self._drift_task and not self._drift_task.done():
+            self._drift_task.cancel()
+            self._drift_task = None
+        if self.loc_simulation:
+            try:
+                await self.loc_simulation.clear()
+            except Exception:
+                pass
+        if self.legacy_loc_sim:
+            try:
+                await self.legacy_loc_sim.clear()
+            except Exception:
+                pass
+        await self.close_session()
+
     async def close_session(self) -> None:
         """Gracefully closes all channels and tunnels."""
+        if self._drift_task and not self._drift_task.done():
+            self._drift_task.cancel()
+            self._drift_task = None
+
         if self.loc_simulation is not None:
             try:
                 await self.loc_simulation.__aexit__(None, None, None)

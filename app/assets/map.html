@@ -140,20 +140,33 @@
       font-weight: 600;
     }
 
-    /* Custom Pulse Pin */
+    /* Custom Radar Pulse Pin */
     .pulse-marker-icon {
       position: relative;
     }
 
     .pin-pulse {
-      width: 32px;
-      height: 32px;
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
-      background: rgba(10, 132, 255, 0.35);
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.5) 0%, rgba(10, 132, 255, 0.2) 65%, transparent 100%);
       position: absolute;
-      top: -16px;
-      left: -16px;
-      animation: pulsate 2s infinite ease-out;
+      top: -20px;
+      left: -20px;
+      animation: pulsate 2.0s infinite cubic-bezier(0.1, 0.7, 0.1, 1);
+      pointer-events: none;
+    }
+
+    .pin-pulse-2 {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(56, 189, 248, 0.6);
+      position: absolute;
+      top: -20px;
+      left: -20px;
+      animation: pulsateRing 2.0s infinite 1.0s cubic-bezier(0.1, 0.7, 0.1, 1);
+      pointer-events: none;
     }
 
     .pin-dot {
@@ -165,16 +178,28 @@
       position: absolute;
       top: -7px;
       left: -7px;
-      box-shadow: 0 0 10px rgba(10, 132, 255, 0.8);
+      box-shadow: 0 0 12px rgba(10, 132, 255, 0.9), 0 0 4px rgba(255, 255, 255, 0.8);
+      transition: transform 0.15s ease-out;
     }
 
     @keyframes pulsate {
       0% {
-        transform: scale(0.6);
-        opacity: 1;
+        transform: scale(0.4);
+        opacity: 0.9;
       }
       100% {
-        transform: scale(2.4);
+        transform: scale(2.8);
+        opacity: 0;
+      }
+    }
+
+    @keyframes pulsateRing {
+      0% {
+        transform: scale(0.4);
+        opacity: 0.8;
+      }
+      100% {
+        transform: scale(2.5);
         opacity: 0;
       }
     }
@@ -251,10 +276,10 @@
       subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
     }).addTo(map);
 
-    // Custom glowing pulse marker
+    // Custom glowing radar pulse marker
     var pulseIcon = L.divIcon({
       className: 'pulse-marker-icon',
-      html: '<div class="pin-pulse"></div><div class="pin-dot"></div>',
+      html: '<div class="pin-pulse"></div><div class="pin-pulse-2"></div><div class="pin-dot"></div>',
       iconSize: [0, 0]
     });
 

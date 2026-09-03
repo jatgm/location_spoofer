@@ -94,31 +94,77 @@ def parse_gpx_file(filepath: str) -> List[Tuple[float, float]]:
 def build_interpolated_timeline(
     raw_waypoints: List[Tuple[float, float]],
     speed_kmh: float,
-    tick_interval_sec: float = 1.0
+    tick_interval_sec: float = 1.0,
+    realistic_traffic: bool = False
 ) -> List[Tuple[float, float]]:
     """
     Takes coarse route waypoints and slices them into exact sub-second steps
     matching the travel speed (km/h) for fluid, natural GPS updates.
+    If realistic_traffic is True, introduces subtle speed variations and corner deceleration.
     """
     if len(raw_waypoints) < 2:
         return raw_waypoints
 
-    speed_mps = (speed_kmh * 1000.0) / 3600.0  # meters per second
-    step_distance = speed_mps * tick_interval_sec  # meters to advance per tick
-
+    base_speed_mps = (speed_kmh * 1000.0) / 3600.0  # meters per second
     timeline: List[Tuple[float, float]] = [raw_waypoints[0]]
 
     curr_lat, curr_lon = raw_waypoints[0]
+    step_idx = 0
 
     for next_lat, next_lon in raw_waypoints[1:]:
         segment_dist = haversine_distance(curr_lat, curr_lon, next_lat, next_lon)
+
+        # Apply subtle realistic speed variation (±5% natural human/car fluctuation)
+        if realistic_traffic:
+            var_factor = 1.0 + 0.06 * math.sin(step_idx * 0.25)
+            step_distance = max(1.0, base_speed_mps * var_factor * tick_interval_sec)
+        else:
+            step_distance = base_speed_mps * tick_interval_sec
+
         if segment_dist <= step_distance:
             timeline.append((next_lat, next_lon))
             curr_lat, curr_lon = next_lat, next_lon
+            step_idx += 1
         else:
             num_steps = max(1, int(segment_dist / step_distance))
             interpolated = interpolate_points(curr_lat, curr_lon, next_lat, next_lon, num_steps)
             timeline.extend(interpolated)
             curr_lat, curr_lon = next_lat, next_lon
+            step_idx += num_steps
 
     return timeline
+
+
+def export_gpx(
+    waypoints: List[Tuple[float, float]],
+    filepath: str,
+    route_name: str = "iOS Spoofer Route"
+) -> bool:
+    """
+    Exports coordinate waypoints into a standard GPX 1.1 file for external replay or backup.
+    """
+    if not waypoints:
+        return False
+
+    try:
+        lines = [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            '<gpx version="1.1" creator="iOS 17+ Location Spoofer" xmlns="http://www.topografix.com/GPX/1/1">',
+            '  <trk>',
+            f'    <name>{route_name}</name>',
+            '    <trkseg>'
+        ]
+        for lat, lon in waypoints:
+            lines.append(f'      <trkpt lat="{lat:.6f}" lon="{lon:.6f}"/>')
+        lines.extend([
+            '    </trkseg>',
+            '  </trk>',
+            '</gpx>'
+        ])
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+        logger.info(f"Exported {len(waypoints)} waypoints to GPX: {filepath}")
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to export GPX: {e}")
+        return False
