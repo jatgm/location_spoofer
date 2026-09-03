@@ -218,7 +218,6 @@ class ControlsWidget(QWidget):
             self.suggestions_list.clear()
             self.suggestions_list.setVisible(False)
             self._search_timer.stop()
-            self.lbl_confirmed.setVisible(False)
         else:
             self._search_timer.start()
 
