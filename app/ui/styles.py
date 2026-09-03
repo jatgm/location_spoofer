@@ -147,6 +147,33 @@ QListWidget#AddressSuggestionsList::item:selected {
     color: #ffffff;
 }
 
+/* Keep Awake Toggle Button */
+QPushButton#KeepAwakeBtn {
+    background-color: #161c28;
+    border: 1px solid #2a3a54;
+    border-radius: 8px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 14px;
+}
+
+QPushButton#KeepAwakeBtn:hover {
+    border: 1px solid #38bdf8;
+    color: #94a3b8;
+}
+
+QPushButton#KeepAwakeBtn:checked {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1a2c4e, stop:1 #132038);
+    border: 1px solid #0284c7;
+    color: #38bdf8;
+}
+
+QPushButton#KeepAwakeBtn:checked:hover {
+    border: 1px solid #38bdf8;
+    background-color: #1e345c;
+}
+
 /* Primary Spoof Button */
 QPushButton#SpoofButton {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0a84ff, stop:1 #0070e0);

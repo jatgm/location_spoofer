@@ -7,7 +7,7 @@ from typing import Dict, List, Any, Optional
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel,
-    QComboBox, QPushButton, QFrame
+    QComboBox, QPushButton, QFrame, QCheckBox
 )
 
 
@@ -16,6 +16,7 @@ class StatusWidget(QWidget):
 
     sig_device_selected = pyqtSignal(str, bool)  # (udid, is_ios17)
     sig_refresh_clicked = pyqtSignal()
+    sig_keep_awake_toggled = pyqtSignal(bool)
 
     STATUS_STYLES = {
         "NO_DEVICE": {
@@ -98,7 +99,24 @@ class StatusWidget(QWidget):
         self.btn_refresh.clicked.connect(self.sig_refresh_clicked.emit)
         layout.addWidget(self.btn_refresh)
 
+        # Keep Awake Toggle Button (Top Right)
+        self.btn_keep_awake = QPushButton("Keep Awake: ON", self)
+        self.btn_keep_awake.setObjectName("KeepAwakeBtn")
+        self.btn_keep_awake.setCheckable(True)
+        self.btn_keep_awake.setChecked(True)
+        self.btn_keep_awake.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_keep_awake.setToolTip("Prevents macOS from sleeping so USB and GPS stay connected")
+        self.btn_keep_awake.toggled.connect(self._on_keep_awake_toggled)
+        layout.addWidget(self.btn_keep_awake)
+
         self.set_status("NO_DEVICE")
+
+    def _on_keep_awake_toggled(self, checked: bool):
+        if checked:
+            self.btn_keep_awake.setText("Keep Awake: ON")
+        else:
+            self.btn_keep_awake.setText("Keep Awake: OFF")
+        self.sig_keep_awake_toggled.emit(checked)
 
     def set_status(self, status_key: str, custom_text: Optional[str] = None):
         cfg = self.STATUS_STYLES.get(status_key, self.STATUS_STYLES["NO_DEVICE"])

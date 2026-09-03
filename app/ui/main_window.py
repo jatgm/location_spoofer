@@ -16,6 +16,7 @@ from app.ui.route_widget import RouteWidget
 from app.ui.log_widget import LogWidget
 from app.ui.styles import DARK_STYLESHEET
 from app.core.worker_thread import DeviceWorker
+from app.core.power_manager import SleepPreventionManager
 
 
 class MainWindow(QMainWindow):
@@ -29,6 +30,10 @@ class MainWindow(QMainWindow):
 
         # Apply curated dark theme
         self.setStyleSheet(DARK_STYLESHEET)
+
+        # Sleep Prevention Manager (caffeinate keep-awake)
+        self.power_manager = SleepPreventionManager()
+        self.power_manager.start_keep_awake()
 
         # Initialize Background Worker Thread
         self.worker = DeviceWorker(self)
@@ -113,6 +118,7 @@ class MainWindow(QMainWindow):
         self.controls_widget.sig_actual_location_requested.connect(self._jump_to_real_location)
         self.status_widget.sig_refresh_clicked.connect(self.worker.refresh_devices_now)
         self.status_widget.sig_device_selected.connect(self.worker.set_target_device)
+        self.status_widget.sig_keep_awake_toggled.connect(self._on_keep_awake_toggled)
 
         # Route Actions -> Worker
         self.route_widget.btn_set_dest_from_map.clicked.connect(
@@ -212,8 +218,17 @@ class MainWindow(QMainWindow):
         msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
         msg_box.exec()
 
+    def _on_keep_awake_toggled(self, enabled: bool):
+        if enabled:
+            self.power_manager.start_keep_awake()
+            self.log_widget.append_log("INFO", "Keep Awake active. System will stay awake while connected.")
+        else:
+            self.power_manager.stop_keep_awake()
+            self.log_widget.append_log("INFO", "Keep Awake deactivated. Standard Mac sleep restored.")
+
     def closeEvent(self, event):
-        """Cleanly terminates background worker on window exit."""
+        """Cleanly terminates background worker and sleep prevention on window exit."""
         self.log_widget.append_log("INFO", "Shutting down background services...")
+        self.power_manager.stop_keep_awake()
         self.worker.stop()
         event.accept()
