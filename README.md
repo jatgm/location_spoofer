@@ -1,6 +1,6 @@
 # iOS 17+ Location Spoofer (macOS Desktop App)
 
-[![Current Version](https://img.shields.io/badge/version-v1.3.1-0a84ff.svg)](https://github.com/jatgm/location_spoofer/releases)
+[![Current Version](https://img.shields.io/badge/version-v1.3.2-0a84ff.svg)](https://github.com/jatgm/location_spoofer/releases)
 [![macOS Compatible](https://img.shields.io/badge/platform-macOS%2012%2B-lightgrey.svg)]()
 [![iOS Support](https://img.shields.io/badge/iOS-17.0%2B-blue.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)

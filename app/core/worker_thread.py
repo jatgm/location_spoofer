@@ -230,7 +230,10 @@ class DeviceWorker(QThread):
 
     def set_natural_drift(self, enabled: bool):
         """Toggles realistic GPS micro-drift."""
-        self.service.set_natural_drift(enabled)
+        if self.loop and self.loop.is_running():
+            self.loop.call_soon_threadsafe(self.service.set_natural_drift, enabled)
+        else:
+            self.service.set_natural_drift(enabled)
 
     def emergency_kill_now(self):
         """Immediately aborts all simulations, tunnels, and restores device physical GPS."""

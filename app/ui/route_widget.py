@@ -52,6 +52,13 @@ class RouteWidget(QWidget):
         self.is_paused: bool = False
         self.gpx_filepath: Optional[str] = None
         self._search_thread: Optional[GeocodeSearchThread] = None
+        self._start_search_thread: Optional[GeocodeSearchThread] = None
+
+        # Debounce timer for start address search
+        self._start_search_timer = QTimer(self)
+        self._start_search_timer.setSingleShot(True)
+        self._start_search_timer.setInterval(350)
+        self._start_search_timer.timeout.connect(self._do_start_search)
 
         # Debounce timer for destination address search
         self._search_timer = QTimer(self)
@@ -189,7 +196,17 @@ class RouteWidget(QWidget):
                 border-color: #38bdf8;
             }
         """)
+        self.start_search_input.textChanged.connect(self._on_start_search_changed)
+        self.start_search_input.returnPressed.connect(self._do_start_search)
         inputs_col.addWidget(self.start_search_input)
+
+        # Suggestions dropdown placed directly below the start input
+        self.start_suggestions_list = QListWidget(self)
+        self.start_suggestions_list.setObjectName("AddressSuggestionsList")
+        self.start_suggestions_list.setMaximumHeight(130)
+        self.start_suggestions_list.setVisible(False)
+        self.start_suggestions_list.itemClicked.connect(self._on_start_suggestion_clicked)
+        inputs_col.addWidget(self.start_suggestions_list)
 
         self.dest_search_input = QLineEdit(self)
         self.dest_search_input.setPlaceholderText("Search destination address or place (e.g. Starbucks)...")
@@ -401,6 +418,64 @@ class RouteWidget(QWidget):
 
         layout.addWidget(ctrl_card)
         layout.addStretch()
+
+    def _on_start_search_changed(self, text: str):
+        cleaned = text.strip()
+        if cleaned == "Your location" or len(cleaned) < 2:
+            self.start_suggestions_list.clear()
+            self.start_suggestions_list.setVisible(False)
+            return
+        self._start_search_timer.start()
+
+    def _do_start_search(self):
+        query = self.start_search_input.text().strip()
+        if query == "Your location" or len(query) < 2:
+            return
+
+        if self._start_search_thread and self._start_search_thread.isRunning():
+            self._start_search_thread.quit()
+            self._start_search_thread.wait()
+
+        self._start_search_thread = GeocodeSearchThread(query, self)
+        self._start_search_thread.sig_results.connect(self._on_start_search_results)
+        self._start_search_thread.start()
+
+    def _on_start_search_results(self, results: list):
+        self.start_suggestions_list.clear()
+        if not results:
+            self.start_suggestions_list.setVisible(False)
+            return
+
+        for item in results:
+            list_item = QListWidgetItem(item["name"])
+            list_item.setToolTip(item["full_name"])
+            list_item.setData(Qt.ItemDataRole.UserRole, item)
+            self.start_suggestions_list.addItem(list_item)
+
+        self.start_suggestions_list.setVisible(True)
+
+    def _on_start_suggestion_clicked(self, list_item: QListWidgetItem):
+        data = list_item.data(Qt.ItemDataRole.UserRole)
+        if not data:
+            return
+
+        self.start_suggestions_list.setVisible(False)
+        self.start_search_input.blockSignals(True)
+        self.start_search_input.setText(data["name"])
+        self.start_search_input.blockSignals(False)
+
+        lat = data["lat"]
+        lon = data["lon"]
+
+        self.start_lat.blockSignals(True)
+        self.start_lon.blockSignals(True)
+        self.start_lat.setValue(lat)
+        self.start_lon.setValue(lon)
+        self.start_lat.blockSignals(False)
+        self.start_lon.blockSignals(False)
+
+        # Recalculate route preview
+        self.sig_destination_changed.emit(self.dest_lat.value(), self.dest_lon.value())
 
     def _on_dest_search_changed(self, text: str):
         cleaned = text.strip()

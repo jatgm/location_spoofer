@@ -189,7 +189,11 @@ class DeviceService:
             self._drift_task.cancel()
             self._drift_task = None
         elif enabled and self.is_spoofing and (not self._drift_task or self._drift_task.done()):
-            self._drift_task = asyncio.create_task(self._drift_loop())
+            try:
+                loop = asyncio.get_running_loop()
+                self._drift_task = loop.create_task(self._drift_loop())
+            except RuntimeError:
+                pass
 
     async def _drift_loop(self):
         """Periodically applies subtle satellite jitter (~0.8m) to mimic real GPS chips."""
