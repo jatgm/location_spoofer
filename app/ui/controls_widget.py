@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox, QPushButton, QGridLayout, QFrame,
     QLineEdit, QListWidget, QListWidgetItem, QAbstractSpinBox
 )
-from app.core.geolocation import search_addresses
+from app.core.geolocation import search_addresses, save_default_location
 
 
 class GeocodeSearchThread(QThread):
@@ -141,13 +141,27 @@ class ControlsWidget(QWidget):
 
         card_layout.addLayout(grid)
 
-        # Quick button: My Actual Location
-        self.btn_my_loc = QPushButton("Jump to Current Location", self)
+        # Buttons Row: Jump to Current Location & Save as Default
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+
+        self.btn_my_loc = QPushButton("Current Location", self)
         self.btn_my_loc.setProperty("class", "SecondaryBtn")
         self.btn_my_loc.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_my_loc.setFixedHeight(32)
+        self.btn_my_loc.setToolTip("Jump to your detected or saved default location")
         self.btn_my_loc.clicked.connect(self.sig_actual_location_requested.emit)
-        card_layout.addWidget(self.btn_my_loc)
+        btn_row.addWidget(self.btn_my_loc, 1)
+
+        self.btn_save_default = QPushButton("Set as Default", self)
+        self.btn_save_default.setProperty("class", "SecondaryBtn")
+        self.btn_save_default.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_save_default.setFixedHeight(32)
+        self.btn_save_default.setToolTip("Saves these exact coordinates so the app opens here every time")
+        self.btn_save_default.clicked.connect(self._on_save_default_clicked)
+        btn_row.addWidget(self.btn_save_default, 1)
+
+        card_layout.addLayout(btn_row)
 
         layout.addWidget(coord_card)
 
@@ -263,6 +277,15 @@ class ControlsWidget(QWidget):
 
         # Notify MainWindow to move the Leaflet map and position the pin
         self.sig_coords_changed.emit(lat, lon)
+
+    def _on_save_default_clicked(self):
+        lat = self.spin_lat.value()
+        lon = self.spin_lon.value()
+        name = self.search_input.text().strip() or f"Saved Home ({lat:.4f}, {lon:.4f})"
+        success = save_default_location(lat, lon, name)
+        if success:
+            self.lbl_confirmed.setText(f"✓ Saved as default location: {name}")
+            self.lbl_confirmed.setVisible(True)
 
     def _on_spin_changed(self):
         if not self._block_signals:
